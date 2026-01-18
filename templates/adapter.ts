@@ -59,7 +59,7 @@ export function initI18n(plugin: Plugin): I18nAdapter {
 
                 t: (k: string, params?: any) => {
                     // 1. 尝试从当前语言获取
-                    const val = dictionaries[currentLocale]?.[k];
+                    const val = dictionaries[currentLocale]?.[k] || dictionaries[currentLocale.split('-')[0]]?.[k];
 
                     // 2. 否则回退到 en (静态)
                     const text = val || en[k as keyof typeof en] || k;
