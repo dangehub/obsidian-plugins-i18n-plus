@@ -1,11 +1,10 @@
 {
-	"id": "sample-plugin",
-	"name": "Sample Plugin",
-	"version": "1.0.0",
+	"id": "i18n-plus",
+	"name": "I18n Plus",
+	"version": "0.1.0",
 	"minAppVersion": "0.15.0",
-	"description": "Demonstrates some of the capabilities of the Obsidian API.",
-	"author": "Obsidian",
-	"authorUrl": "https://obsidian.md",
-	"fundingUrl": "https://obsidian.md/pricing",
+	"description": "A universal i18n framework for Obsidian plugins. Enables dynamic loading/unloading of translation dictionaries.",
+	"author": "zenozero-dev",
+	"authorUrl": "https://github.com/zenozero-dev",
 	"isDesktopOnly": false
 }

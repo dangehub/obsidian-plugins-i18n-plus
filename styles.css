@@ -1,19 +1,79 @@
-/*
+/* I18n Plus Styles */
 
-This CSS file will be included with your plugin, and
-available in the app when your plugin is enabled.
+.i18n-plus-manager {
+    padding: 10px;
+}
 
-If your plugin does not need CSS, delete this file.
+.i18n-plus-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
 
-*/
+.i18n-plus-header h2 {
+    margin: 0;
+}
 
-/* Group settings compatibility styling for older Obsidian builds (< 1.11.0) */
-/* Scoped to only this plugin's settings container to avoid affecting other plugins */
-.sample-plugin-settings-compat .setting-group-heading h3 {
-    margin: 0 0 0.75rem;
-    padding-bottom: 0.5rem;
-    padding-top: 0.5rem;
-    font-size: 1rem;
-    font-weight: 600;
-    border-bottom: none !important;
+.i18n-plus-manager h3 {
+    margin-top: 20px;
+    margin-bottom: 10px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+
+/* 可滚动的插件列表 */
+.i18n-plus-plugin-list {
+    max-height: 400px;
+    overflow-y: auto;
+    padding-right: 5px;
+}
+
+.i18n-plus-plugin-section {
+    margin-bottom: 15px;
+    padding: 12px;
+    background: var(--background-secondary);
+    border-radius: 8px;
+}
+
+.i18n-plus-plugin-section .setting-item {
+    border-bottom: none;
+    padding: 0;
+}
+
+.i18n-plus-no-dict {
+    display: block;
+    margin-top: 8px;
+    opacity: 0.6;
+}
+
+.i18n-plus-dict-list {
+    margin-top: 10px;
+    padding-left: 10px;
+    border-left: 2px solid var(--background-modifier-border);
+}
+
+.i18n-plus-dict-item {
+    margin-bottom: 5px;
+}
+
+.i18n-plus-dict-item .setting-item {
+    padding: 4px 0;
+    border-bottom: none;
+}
+
+.i18n-plus-dict-item .setting-item-name {
+    font-size: 13px;
+}
+
+.i18n-plus-dict-item .setting-item-description {
+    font-size: 11px;
+}
+
+.i18n-plus-orphan-list {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.i18n-plus-orphan-list .setting-item {
+    padding: 5px 0;
 }
