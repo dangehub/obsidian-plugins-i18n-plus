@@ -57,13 +57,13 @@ export class DictionaryStore {
      */
     async ensureDirectory(path: string): Promise<void> {
         const normalizedPath = normalizePath(path);
-        const folder = this.app.vault.getAbstractFileByPath(normalizedPath);
+        const exists = await this.app.vault.adapter.exists(normalizedPath);
 
-        if (!folder) {
+        if (!exists) {
             try {
-                await this.app.vault.createFolder(normalizedPath);
+                await this.app.vault.adapter.mkdir(normalizedPath);
             } catch (error) {
-                // Ignore "Folder already exists" error (might be caused by concurrent creation)
+                // Ignore "Folder already exists" error
                 if (!(error instanceof Error && error.message.includes('Folder already exists'))) {
                     throw error;
                 }
@@ -100,7 +100,6 @@ export class DictionaryStore {
         const content = JSON.stringify(dict, null, 2);
 
         try {
-            // Use adapter.write directly to overwrite file
             await this.app.vault.adapter.write(filePath, content);
             console.info(`[i18n-plus] Saved dictionary: ${filePath}`);
         } catch (error) {
@@ -114,14 +113,12 @@ export class DictionaryStore {
      */
     async loadDictionary(pluginId: string, locale: string): Promise<Dictionary | null> {
         const filePath = this.getDictionaryFilePath(pluginId, locale);
-        const file = this.app.vault.getAbstractFileByPath(filePath);
-
-        if (!(file instanceof TFile)) {
-            return null;
-        }
 
         try {
-            const content = await this.app.vault.read(file);
+            if (!(await this.app.vault.adapter.exists(filePath))) {
+                return null;
+            }
+            const content = await this.app.vault.adapter.read(filePath);
             return JSON.parse(content) as Dictionary;
         } catch (error) {
             console.error(`[i18n-plus] Failed to load dictionary: ${filePath}`, error);
@@ -134,12 +131,15 @@ export class DictionaryStore {
      */
     async deleteDictionary(pluginId: string, locale: string): Promise<boolean> {
         const filePath = this.getDictionaryFilePath(pluginId, locale);
-        const file = this.app.vault.getAbstractFileByPath(filePath);
 
-        if (file instanceof TFile) {
-            await this.app.vault.delete(file);
-            console.info(`[i18n-plus] Deleted dictionary: ${filePath}`);
-            return true;
+        try {
+            if (await this.app.vault.adapter.exists(filePath)) {
+                await this.app.vault.adapter.remove(filePath);
+                console.info(`[i18n-plus] Deleted dictionary: ${filePath}`);
+                return true;
+            }
+        } catch (error) {
+            console.error(`[i18n-plus] Failed to delete dictionary: ${filePath}`, error);
         }
 
         return false;
@@ -163,9 +163,8 @@ export class DictionaryStore {
 
         for (const info of pluginDicts) {
             try {
-                const file = this.app.vault.getAbstractFileByPath(info.filePath);
-                if (file instanceof TFile) {
-                    const content = await this.app.vault.read(file);
+                if (await this.app.vault.adapter.exists(info.filePath)) {
+                    const content = await this.app.vault.adapter.read(info.filePath);
                     const dict = JSON.parse(content);
                     manager.loadDictionary(pluginId, info.locale, dict);
                     count++;
@@ -187,46 +186,59 @@ export class DictionaryStore {
      */
     async listAllDictionaries(): Promise<DictionaryFileInfo[]> {
         const result: DictionaryFileInfo[] = [];
-        const baseFolder = this.app.vault.getAbstractFileByPath(this.basePath);
 
-        if (!(baseFolder instanceof TFolder)) {
-            return result;
-        }
-
-        // Iterate through plugin directories
-        for (const pluginFolder of baseFolder.children) {
-            if (!(pluginFolder instanceof TFolder)) continue;
-
-            const pluginId = pluginFolder.name;
-
-            // Iterate through dictionary files
-            for (const file of pluginFolder.children) {
-                if (!(file instanceof TFile) || !file.name.endsWith('.json')) continue;
-
-                const locale = file.name.replace('.json', '');
-
-                // Try to read meta info
-                let dictVersion: string | undefined;
-                let pluginVersion: string | undefined;
-
-                try {
-                    const content = await this.app.vault.read(file);
-                    const dict = JSON.parse(content) as Dictionary;
-                    dictVersion = dict.$meta?.dictVersion;
-                    pluginVersion = dict.$meta?.pluginVersion;
-                } catch {
-                    // Ignore parse errors
-                }
-
-                result.push({
-                    pluginId,
-                    locale,
-                    fileName: file.name,
-                    filePath: file.path,
-                    dictVersion,
-                    pluginVersion,
-                });
+        try {
+            if (!(await this.app.vault.adapter.exists(this.basePath))) {
+                return result;
             }
+
+            const baseList = await this.app.vault.adapter.list(this.basePath);
+            // baseList.folders contains paths to folders
+
+            // Iterate through plugin directories
+            for (const pluginFolderPath of baseList.folders) {
+                // pluginFolderPath is full path, we need to extract basename for pluginId
+                // But normalizePath logic suggests paths are what we expect. 
+                // Let's safe extract pluginId
+                const pluginId = pluginFolderPath.split('/').pop() || '';
+                if (!pluginId) continue;
+
+                const pluginList = await this.app.vault.adapter.list(pluginFolderPath);
+
+                // Iterate through dictionary files
+                for (const filePath of pluginList.files) {
+                    if (!filePath.endsWith('.json')) continue;
+
+                    const fileName = filePath.split('/').pop() || '';
+                    if (!fileName) continue;
+
+                    const locale = fileName.replace('.json', '');
+
+                    // Try to read meta info
+                    let dictVersion: string | undefined;
+                    let pluginVersion: string | undefined;
+
+                    try {
+                        const content = await this.app.vault.adapter.read(filePath);
+                        const dict = JSON.parse(content) as Dictionary;
+                        dictVersion = dict.$meta?.dictVersion;
+                        pluginVersion = dict.$meta?.pluginVersion;
+                    } catch {
+                        // Ignore parse errors
+                    }
+
+                    result.push({
+                        pluginId,
+                        locale,
+                        fileName: fileName,
+                        filePath: filePath,
+                        dictVersion,
+                        pluginVersion,
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('[i18n-plus] Failed to list dictionaries', error);
         }
 
         return result;
