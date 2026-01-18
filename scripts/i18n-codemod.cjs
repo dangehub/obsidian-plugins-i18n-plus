@@ -142,6 +142,22 @@ module.exports = function (file, api) {
         });
     });
 
+    // 2.5 Replace .addOption(value, displayText) - translate the second argument
+    root.find(j.CallExpression, {
+        callee: { property: { name: 'addOption' } }
+    }).forEach(path => {
+        const args = path.value.arguments;
+        // addOption takes (value, displayText) - we want to translate displayText (second arg)
+        if (args.length >= 2) {
+            const text = flattenBinaryString(args[1]);
+            if (text !== null && !shouldIgnore(text)) {
+                trackString(text);
+                args[1] = createTCall(text, path);
+                stats.replaced++;
+            }
+        }
+    });
+
     // 3. Replace createEl('tag', { text: "..." })
     root.find(j.CallExpression, {
         callee: { property: { name: 'createEl' } }
