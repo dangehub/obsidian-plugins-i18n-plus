@@ -60,6 +60,9 @@ export class DictionaryManagerModal extends Modal {
         const registeredPlugins = manager.getRegisteredPlugins();
         const installedDicts = await this.store.listAllDictionaries();
 
+        console.log('[i18n-plus UI] Registered plugins:', registeredPlugins);
+        console.log('[i18n-plus UI] Installed dicts:', installedDicts);
+
         // Registered Plugins Section - Use scrollable container
         contentEl.createEl('h3', { text: `Registered Plugins (${registeredPlugins.length})` });
 

@@ -193,7 +193,9 @@ export class DictionaryStore {
             }
 
             const baseList = await this.app.vault.adapter.list(this.basePath);
-            // baseList.folders contains paths to folders
+            if (this.plugin.settings.debugMode) {
+                console.log(`[i18n-plus] Scanning base path: ${this.basePath}`, baseList);
+            }
 
             // Iterate through plugin directories
             for (const pluginFolderPath of baseList.folders) {
@@ -204,6 +206,9 @@ export class DictionaryStore {
                 if (!pluginId) continue;
 
                 const pluginList = await this.app.vault.adapter.list(pluginFolderPath);
+                if (this.plugin.settings.debugMode) {
+                    console.log(`[i18n-plus] Scanning plugin folder: ${pluginId}`, pluginList);
+                }
 
                 // Iterate through dictionary files
                 for (const filePath of pluginList.files) {
@@ -239,6 +244,10 @@ export class DictionaryStore {
             }
         } catch (error) {
             console.error('[i18n-plus] Failed to list dictionaries', error);
+        }
+
+        if (this.plugin.settings.debugMode) {
+            console.log('[i18n-plus] Found dictionaries:', result);
         }
 
         return result;
