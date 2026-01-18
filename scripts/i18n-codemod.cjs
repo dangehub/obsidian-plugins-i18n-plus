@@ -37,12 +37,56 @@ module.exports = function (file, api) {
         stats.strings[text]++;
     }
 
+    // Helper: Determine if we should use this.plugin.t() instead of this.t()
+    function shouldUsePluginT(path) {
+        let current = path;
+        while (current && current.node.type !== 'ClassDeclaration' && current.node.type !== 'ClassExpression') {
+            current = current.parent;
+        }
+        if (!current) return false;
+
+        const classBody = current.node.body.body;
+        if (!classBody) return false;
+
+        // Check for ClassProperty 'plugin'
+        const hasPluginProp = classBody.some(n =>
+            (n.type === 'ClassProperty' || n.type === 'PropertyDefinition') &&
+            n.key && n.key.name === 'plugin'
+        );
+        if (hasPluginProp) return true;
+
+        // Check constructor TSParameterProperty (e.g. constructor(private plugin: Plugin))
+        // MethodDefinition -> FunctionExpression -> params
+        // ClassMethod -> params
+        const constructor = classBody.find(n =>
+            (n.type === 'MethodDefinition' || n.type === 'ClassMethod') &&
+            n.key && n.key.name === 'constructor'
+        );
+
+        if (constructor) {
+            const params = constructor.value ? constructor.value.params : constructor.params;
+            if (params) {
+                const hasPluginParam = params.some(p =>
+                    p.type === 'TSParameterProperty' &&
+                    p.parameter && p.parameter.name === 'plugin'
+                );
+                if (hasPluginParam) return true;
+            }
+        }
+
+        return false;
+    }
+
     // Helper: Generate t() call node
-    // Assumes usages within class methods, using this.t()
-    // If not in a class (e.g. function), might need plugin.t(), here simplified to default this.t()
-    function createTCall(text) {
+    function createTCall(text, path) {
+        let object = j.thisExpression();
+
+        if (path && shouldUsePluginT(path)) {
+            object = j.memberExpression(j.thisExpression(), j.identifier('plugin'));
+        }
+
         return j.callExpression(
-            j.memberExpression(j.thisExpression(), j.identifier('t')),
+            j.memberExpression(object, j.identifier('t')),
             [j.stringLiteral(text)]
         );
     }
@@ -71,7 +115,7 @@ module.exports = function (file, api) {
             const text = flattenBinaryString(args[0]);
             if (text !== null && !shouldIgnore(text)) {
                 trackString(text);
-                args[0] = createTCall(text);
+                args[0] = createTCall(text, path);
                 stats.replaced++;
             }
         }
@@ -90,7 +134,7 @@ module.exports = function (file, api) {
                 if (text !== null && !shouldIgnore(text)) {
                     trackString(text);
                     if (args.length <= 1) { // Only replace when there are no extra arguments (avoid setDesc(text, frag) etc.)
-                        args[0] = createTCall(text);
+                        args[0] = createTCall(text, path);
                         stats.replaced++;
                     }
                 }
@@ -111,7 +155,7 @@ module.exports = function (file, api) {
                     const text = flattenBinaryString(prop.value);
                     if (text !== null && !shouldIgnore(text)) {
                         trackString(text);
-                        prop.value = createTCall(text);
+                        prop.value = createTCall(text, path);
                         stats.replaced++;
                     }
                 }
@@ -128,7 +172,7 @@ module.exports = function (file, api) {
             const text = flattenBinaryString(args[0]);
             if (text !== null && !shouldIgnore(text)) {
                 trackString(text);
-                args[0] = createTCall(text);
+                args[0] = createTCall(text, path);
                 stats.replaced++;
             }
         }
