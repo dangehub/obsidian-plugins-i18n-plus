@@ -54,9 +54,13 @@ jobs:
 
       - name: Replace Strings (Codemod)
         run: |
-          jscodeshift -t _i18n_tools/scripts/i18n-codemod.cjs ${{ inputs.target_main_file }} --parser=ts --run-in-band
-          # You can add more files/directories here like:
-          # jscodeshift -t _i18n_tools/scripts/i18n-codemod.cjs src/ --parser=ts --run-in-band
+          SRC_DIR=$(dirname ${{ inputs.target_main_file }})
+          echo "Running codemod on $SRC_DIR with extensions ts,tsx..."
+          jscodeshift -t _i18n_tools/scripts/i18n-codemod.cjs $SRC_DIR \
+            --parser=ts \
+            --extensions=ts,tsx \
+            --run-in-band \
+            --verbose=2
 
       - name: Extract Keys
         run: |
