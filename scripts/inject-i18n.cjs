@@ -92,43 +92,69 @@ module.exports = function (file, api) {
     }
 
     // 3. Inject init code in onload()
-    const onloadMethod = pluginClass.find(j.MethodDefinition, {
+    // Try MethodDefinition (ESTree) and ClassMethod (Babel)
+    let onloadMethod = pluginClass.find(j.MethodDefinition, {
         key: { name: 'onload' }
     });
 
+    if (onloadMethod.size() === 0) {
+        onloadMethod = pluginClass.find(j.ClassMethod, {
+            key: { name: 'onload' }
+        });
+    }
+
+    // Fallback: manual search in body
+    if (onloadMethod.size() === 0) {
+        const methods = classBody.body.filter(node =>
+            (node.type === 'MethodDefinition' || node.type === 'ClassMethod' || node.type === 'TSMethodSignature') &&
+            node.key && node.key.name === 'onload'
+        );
+        if (methods.length > 0) {
+            // Construct a collection from the node
+            onloadMethod = j(methods[0]);
+        }
+    }
+
     if (onloadMethod.size() > 0) {
-        const block = onloadMethod.get().node.value.body;
+        // Handle both collection and raw node wrapper
+        const firstNode = onloadMethod.get();
+        const methodNode = firstNode.node || firstNode;
+        const block = methodNode.value ? methodNode.value.body : methodNode.body; // MethodDefinition has .value, ClassMethod has .body direct
 
-        // Check if already initialized
-        const alreadyInit = j(block).find(j.CallExpression, {
-            callee: { name: 'initI18n' }
-        }).size() > 0;
+        if (block && block.body) {
+            // Check if already initialized
+            const alreadyInit = j(block).find(j.CallExpression, {
+                callee: { name: 'initI18n' }
+            }).size() > 0;
 
-        if (!alreadyInit) {
-            // this.i18n = initI18n(this);
-            const initStmt = j.expressionStatement(
-                j.assignmentExpression(
-                    '=',
-                    j.memberExpression(j.thisExpression(), j.identifier('i18n')),
-                    j.callExpression(j.identifier('initI18n'), [j.thisExpression()])
-                )
-            );
-
-            // this.t = this.i18n.t;
-            const bindStmt = j.expressionStatement(
-                j.assignmentExpression(
-                    '=',
-                    j.memberExpression(j.thisExpression(), j.identifier('t')),
-                    j.memberExpression(
+            if (!alreadyInit) {
+                // this.i18n = initI18n(this);
+                const initStmt = j.expressionStatement(
+                    j.assignmentExpression(
+                        '=',
                         j.memberExpression(j.thisExpression(), j.identifier('i18n')),
-                        j.identifier('t')
+                        j.callExpression(j.identifier('initI18n'), [j.thisExpression()])
                     )
-                )
-            );
+                );
 
-            // Insert at the beginning of onload
-            block.body.unshift(bindStmt);
-            block.body.unshift(initStmt);
+                // this.t = this.i18n.t;
+                const bindStmt = j.expressionStatement(
+                    j.assignmentExpression(
+                        '=',
+                        j.memberExpression(j.thisExpression(), j.identifier('t')),
+                        j.memberExpression(
+                            j.memberExpression(j.thisExpression(), j.identifier('i18n')),
+                            j.identifier('t')
+                        )
+                    )
+                );
+
+                // Insert at the beginning of onload
+                block.body.unshift(bindStmt);
+                block.body.unshift(initStmt);
+            }
+        } else {
+            console.warn('Found "onload" but could not access body.');
         }
     } else {
         console.warn('Could not find "onload" method.');

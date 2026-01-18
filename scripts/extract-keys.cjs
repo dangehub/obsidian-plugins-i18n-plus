@@ -70,4 +70,14 @@ function generateLocaleFile(keys, outputPath) {
 
 const targetDir = process.argv[2] || 'src';
 const extractedKeys = extractKeys(targetDir);
-generateLocaleFile(extractedKeys, 'src/lang/locales/en.ts');
+
+// Infer or read output path
+let outputPath = process.argv[3];
+if (!outputPath) {
+    // If targetDir looks like "path/to/src", we want "path/to/src/lang/locales/en.ts"
+    // If targetDir is just ".", we might guess.
+    // For now, let's default to joining.
+    outputPath = path.join(targetDir, 'lang', 'locales', 'en.ts');
+}
+
+generateLocaleFile(extractedKeys, outputPath);

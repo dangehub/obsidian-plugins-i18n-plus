@@ -36,35 +36,13 @@ jobs:
           SRC_DIR=$(dirname ${{ inputs.target_main_file }})
           mkdir -p $SRC_DIR/lang
           
-          # Copy i18n.ts adapter template
-          # Assuming we have a standard template in i18n-plus repo
-          # If not, we might need a dedicated template file. 
-          # For now, we will use a simplified version inline or from a known location.
-          
-          # IMPORTANT: In a real scenario, you should have a "templates/adapter.ts" in i18n-plus repo.
-          # Here we try to find it from the checked out tool repo.
-          
+          # Copy generic adapter from i18n-plus tools
           if [ -f "_i18n_tools/templates/adapter.ts" ]; then
             cp _i18n_tools/templates/adapter.ts $SRC_DIR/lang/i18n.ts
+            echo "✅ Adapter successfully copied."
           else
-             # Fallback: Create a minimal adapter dynamically
-             echo "Creating default adapter..."
-             cat > $SRC_DIR/lang/i18n.ts <<EOF
-import { Plugin } from 'obsidian';
-
-export interface I18nAdapter {
-    t(key: string, params?: Record<string, string | number>): string;
-    // ... complete adapter code ...
-}
-
-export function initI18n(plugin: Plugin): any {
-    // Stub implementation
-    return {
-        t: (k: string) => k,
-        getLocale: () => 'en',
-    };
-}
-EOF
+            echo "❌ Error: _i18n_tools/templates/adapter.ts not found."
+            exit 1
           fi
 
       - name: Install jscodeshift
