@@ -144,6 +144,70 @@ Codemod 并非万能。以下情况需要人工（或 AI）介入：
 > 5. 运行 Extractor 生成 en.ts。
 > 6. 最终生成一份 zh-CN.json 给我。"
 
+
+---
+
+## ⚡ 进阶：GitHub Action 自动化迁移
+
+我们提供了一套自动化方案，你可以通过 Fork 仓库并运行 GitHub Action 来完成 90% 的迁移工作。
+
+### 准备工作
+
+1.  **Fork** 目标插件仓库。
+2.  在 `.github/workflows/` 目录下创建 `i18n-migrate.yml`。
+
+### Workflow 配置
+
+复制以下内容到 `i18n-migrate.yml`：
+
+```yaml
+name: Auto I18n Migration
+on: workflow_dispatch
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with: { node-version: '18' }
+      
+      # 1. 检出工具链
+      - uses: actions/checkout@v3
+        with:
+          repository: your-username/obsidian-plugins-i18n-plus
+          path: _i18n_tools
+
+      # 2. 安装依赖
+      - run: npm install -g jscodeshift typescript
+
+      # 3. 自动注入代码 (Adapter & Init)
+      - run: |
+          jscodeshift -t _i18n_tools/scripts/inject-i18n.cjs src/main.ts --parser=ts --run-in-band
+
+      # 4. 替换字符串
+      - run: |
+          jscodeshift -t _i18n_tools/scripts/i18n-codemod.cjs src/ --parser=ts --run-in-band
+
+      # 5. 生成 Keys
+      - run: node _i18n_tools/scripts/extract-keys.cjs src
+
+      # 6. 提交 PR
+      - uses: peter-evans/create-pull-request@v5
+        with:
+          title: 'refactor: Auto-migrate to i18n-plus'
+          branch: refactor/i18n-plus-migration
+```
+
+### 工作原理
+
+1.  **Inject Script (`inject-i18n.cjs`)**:
+    *   自动解析 `main.ts` AST。
+    *   注入 `import { initI18n }`。
+    *   在类中添加 `i18n` 和 `t` 属性。
+    *   在 `onload()` 方法首行插入初始化代码。
+2.  **Codemod Script**: 转换 `src/` 下的所有硬编码字符串。
+3.  **Create PR**: 将所有更改提交为一个 Pull Request，方便你进行最终的人工审查。
+
 ---
 
 此指南由 Antigravity 总结于 Dataview 汉化实战。
