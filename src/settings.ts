@@ -6,8 +6,6 @@ import { App, PluginSettingTab, Setting } from 'obsidian';
 import type I18nPlusPlugin from './main';
 
 export interface I18nPlusSettings {
-	/** 词典存储目录 */
-	dictionaryPath: string;
 	/** 是否显示调试日志 */
 	debugMode: boolean;
 	/** 当前语言（持久化用户选择） */
@@ -15,7 +13,6 @@ export interface I18nPlusSettings {
 }
 
 export const DEFAULT_SETTINGS: I18nPlusSettings = {
-	dictionaryPath: 'dictionaries',
 	debugMode: false,
 	currentLocale: '',  // 空表示使用 Obsidian 默认语言
 };
@@ -33,17 +30,6 @@ export class I18nPlusSettingTab extends PluginSettingTab {
 		containerEl.empty();
 
 		containerEl.createEl('h2', { text: 'I18n Plus Settings' });
-
-		new Setting(containerEl)
-			.setName('Dictionary storage path')
-			.setDesc('Relative path within the vault to store dictionaries')
-			.addText(text => text
-				.setPlaceholder('dictionaries')
-				.setValue(this.plugin.settings.dictionaryPath)
-				.onChange(async (value) => {
-					this.plugin.settings.dictionaryPath = value;
-					await this.plugin.saveSettings();
-				}));
 
 		new Setting(containerEl)
 			.setName('Debug mode')

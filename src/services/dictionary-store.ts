@@ -48,7 +48,8 @@ export class DictionaryStore {
      * Get dictionary storage root path
      */
     get basePath(): string {
-        return normalizePath(this.plugin.settings.dictionaryPath || 'dictionaries');
+        // Enforce storage in plugin directory: .obsidian/plugins/i18n-plus/dictionaries
+        return normalizePath(`${this.plugin.manifest.dir}/dictionaries`);
     }
 
     /**
