@@ -1,12 +1,12 @@
 /**
  * I18n Plus - Dictionary Management Modal
  * 
- * 词典管理界面，提供：
- * - 查看已注册插件列表
- * - 区分内置语言和导入语言
- * - 切换插件语言
- * - 导入/导出词典文件
- * - 卸载词典
+ * Dictionary management interface, providing:
+ * - Viewing registered plugin list
+ * - Distinguishing between builtin and imported locales
+ * - Switching plugin languages
+ * - Importing/Exporting dictionary files
+ * - Unloading dictionaries
  */
 
 import { App, Modal, Setting, Notice } from 'obsidian';
@@ -16,7 +16,7 @@ import { DictionaryStore, DictionaryFileInfo } from '../services/dictionary-stor
 import { OBSIDIAN_LOCALES } from '../framework/locales';
 
 /**
- * 词典管理 Modal
+ * Dictionary Manager Modal
  */
 export class DictionaryManagerModal extends Modal {
     private plugin: I18nPlusPlugin;
@@ -33,39 +33,39 @@ export class DictionaryManagerModal extends Modal {
         contentEl.empty();
         contentEl.addClass('i18n-plus-manager');
 
-        // 标题和刷新按钮
+        // Header and Refresh Button
         const headerDiv = contentEl.createDiv({ cls: 'i18n-plus-header' });
-        headerDiv.createEl('h2', { text: '📚 词典管理器' });
+        headerDiv.createEl('h2', { text: '📚 Dictionary Manager' });
 
-        // 刷新按钮
+        // Refresh Button
         new Setting(headerDiv)
             .addButton(btn => btn
-                .setButtonText('🔄 刷新')
-                .setTooltip('重新加载词典并刷新界面')
+                .setButtonText('🔄 Refresh')
+                .setTooltip('Reload dictionaries and refresh interface')
                 .onClick(async () => {
                     const count = await this.plugin.dictionaryStore.autoLoadDictionaries();
-                    new Notice(`已刷新，加载了 ${count} 个词典`);
+                    new Notice(`Refreshed. Loaded ${count} dictionaries`);
                     this.onOpen();
                 })
             );
 
-        // 简介
+        // Intro
         contentEl.createEl('p', {
-            text: '管理已注册插件的翻译词典。',
+            text: 'Manage translation dictionaries for registered plugins.',
             cls: 'setting-item-description'
         });
 
-        // 获取数据
+        // Get Data
         const manager = getI18nPlusManager();
         const registeredPlugins = manager.getRegisteredPlugins();
         const installedDicts = await this.store.listAllDictionaries();
 
-        // 已注册插件部分 - 使用可滚动容器
-        contentEl.createEl('h3', { text: `已注册插件 (${registeredPlugins.length})` });
+        // Registered Plugins Section - Use scrollable container
+        contentEl.createEl('h3', { text: `Registered Plugins (${registeredPlugins.length})` });
 
         if (registeredPlugins.length === 0) {
             contentEl.createEl('p', {
-                text: '暂无插件注册到 i18n-plus。',
+                text: 'No plugins registered to i18n-plus.',
                 cls: 'setting-item-description'
             });
         } else {
@@ -75,12 +75,12 @@ export class DictionaryManagerModal extends Modal {
             }
         }
 
-        // 孤立词典
+        // Orphan Dictionaries
         const orphanDicts = installedDicts.filter(d => !registeredPlugins.includes(d.pluginId));
         if (orphanDicts.length > 0) {
-            contentEl.createEl('h3', { text: `⚠️ 孤立词典 (${orphanDicts.length})` });
+            contentEl.createEl('h3', { text: `⚠️ Orphan Dictionaries (${orphanDicts.length})` });
             contentEl.createEl('p', {
-                text: '目标插件未注册',
+                text: 'Metrics for target plugin not registered',
                 cls: 'setting-item-description'
             });
             this.renderOrphanDictsList(contentEl, orphanDicts);
@@ -88,7 +88,7 @@ export class DictionaryManagerModal extends Modal {
     }
 
     /**
-     * 渲染单个插件的部分
+     * Render single plugin section
      */
     private async renderPluginSection(
         container: HTMLElement,
@@ -106,14 +106,14 @@ export class DictionaryManagerModal extends Modal {
 
         const section = container.createDiv({ cls: 'i18n-plus-plugin-section' });
 
-        // 插件卡片
+        // Plugin Card
         const pluginSetting = new Setting(section)
             .setName(pluginId)
             .setDesc(this.buildLocaleDescription(builtinLocales, externalLocales));
 
-        // 语言切换下拉框
+        // Locale Switcher Dropdown
         pluginSetting.addDropdown(dropdown => {
-            // 添加所有可用语言
+            // Add all available locales
             const allLocales = [...new Set([...builtinLocales, ...externalLocales])];
             for (const locale of allLocales) {
                 const localeInfo = OBSIDIAN_LOCALES.find(l => l.code === locale);
@@ -125,22 +125,39 @@ export class DictionaryManagerModal extends Modal {
             dropdown.onChange(async (value) => {
                 translator.setLocale(value);
                 manager.setGlobalLocale(value);
-                new Notice(`已切换 ${pluginId} 语言为: ${value}`);
+                new Notice(`Switched ${pluginId} locale to: ${value}`);
             });
         });
 
-        // 导入按钮
+        // Import Button
         pluginSetting.addButton(btn => btn
             .setButtonText('📥')
-            .setTooltip('导入词典')
+            .setTooltip('Import Dictionary')
             .onClick(() => this.importDictionaryForPlugin(pluginId))
         );
 
-        // 外部词典管理（如果有）
+        // Builtin Dictionary Management
+        if (builtinLocales.length > 0) {
+            const builtinDiv = section.createDiv({ cls: 'i18n-plus-dict-list' });
+
+            for (const locale of builtinLocales) {
+                const item = builtinDiv.createDiv({ cls: 'i18n-plus-dict-item' });
+                new Setting(item)
+                    .setName(`📦 ${locale} (Builtin)`)
+                    .setDesc('Source')
+                    .addButton(btn => btn
+                        .setIcon('download')
+                        .setTooltip('Export (As translation template)')
+                        .onClick(() => this.exportBuiltinDictionary(pluginId, locale))
+                    );
+            }
+        }
+
+        // External Dictionary Management (if any)
         if (pluginDicts.length > 0) {
             const dictDiv = section.createDiv({ cls: 'i18n-plus-dict-list' });
             dictDiv.createEl('small', {
-                text: `已导入 ${pluginDicts.length} 个词典`,
+                text: `Imported ${pluginDicts.length} dictionaries`,
                 cls: 'setting-item-description'
             });
             for (const dict of pluginDicts) {
@@ -148,31 +165,31 @@ export class DictionaryManagerModal extends Modal {
             }
         } else {
             section.createEl('small', {
-                text: '0 个导入词典',
+                text: '0 imported dictionaries',
                 cls: 'setting-item-description i18n-plus-no-dict'
             });
         }
     }
 
     /**
-     * 构建语言描述
+     * Build locale description string
      */
     private buildLocaleDescription(builtinLocales: string[], externalLocales: string[]): string {
         const parts: string[] = [];
         if (builtinLocales.length > 0) {
-            parts.push(`内置: ${builtinLocales.join(', ')}`);
+            parts.push(`Builtin: ${builtinLocales.join(', ')}`);
         }
         if (externalLocales.length > 0) {
             const uniqueExternal = externalLocales.filter(l => !builtinLocales.includes(l));
             if (uniqueExternal.length > 0) {
-                parts.push(`导入: ${uniqueExternal.join(', ')}`);
+                parts.push(`Imported: ${uniqueExternal.join(', ')}`);
             }
         }
         return parts.join(' | ');
     }
 
     /**
-     * 渲染单个词典条目
+     * Render single dictionary item
      */
     private renderDictItem(container: HTMLElement, dict: DictionaryFileInfo) {
         const item = container.createDiv({ cls: 'i18n-plus-dict-item' });
@@ -182,19 +199,19 @@ export class DictionaryManagerModal extends Modal {
             .setDesc(`v${dict.dictVersion || '?'}`)
             .addButton(btn => btn
                 .setIcon('download')
-                .setTooltip('导出')
+                .setTooltip('Export')
                 .onClick(() => this.exportDictionary(dict))
             )
             .addButton(btn => btn
                 .setIcon('trash')
-                .setTooltip('卸载')
+                .setTooltip('Unload')
                 .setWarning()
                 .onClick(() => this.unloadDictionary(dict))
             );
     }
 
     /**
-     * 渲染孤立词典列表
+     * Render orphan dictionary list
      */
     private renderOrphanDictsList(container: HTMLElement, dicts: DictionaryFileInfo[]) {
         const list = container.createDiv({ cls: 'i18n-plus-orphan-list' });
@@ -206,7 +223,7 @@ export class DictionaryManagerModal extends Modal {
                     .setWarning()
                     .onClick(async () => {
                         await this.store.deleteDictionary(dict.pluginId, dict.locale);
-                        new Notice(`已删除`);
+                        new Notice(`Deleted`);
                         this.onOpen();
                     })
                 );
@@ -214,7 +231,7 @@ export class DictionaryManagerModal extends Modal {
     }
 
     /**
-     * 为指定插件导入词典
+     * Import dictionary for specific plugin
      */
     private importDictionaryForPlugin(pluginId: string) {
         const input = document.createElement('input');
@@ -228,11 +245,11 @@ export class DictionaryManagerModal extends Modal {
             const result = await this.store.importFromFile(file, pluginId);
 
             if (result.valid) {
-                new Notice(`✅ 导入成功`);
+                new Notice(`✅ Import Successful`);
                 this.onOpen();
             } else {
-                const errorMsg = result.errors?.map(e => e.message).join(', ') || '未知错误';
-                new Notice(`❌ 导入失败: ${errorMsg}`);
+                const errorMsg = result.errors?.map(e => e.message).join(', ') || 'Unknown error';
+                new Notice(`❌ Import Failed: ${errorMsg}`);
             }
         };
 
@@ -240,12 +257,12 @@ export class DictionaryManagerModal extends Modal {
     }
 
     /**
-     * 导出词典
+     * Export dictionary
      */
     private async exportDictionary(dict: DictionaryFileInfo) {
         const blob = await this.store.exportToBlob(dict.pluginId, dict.locale);
         if (!blob) {
-            new Notice('导出失败');
+            new Notice('Export failed');
             return;
         }
 
@@ -256,17 +273,55 @@ export class DictionaryManagerModal extends Modal {
         a.click();
         URL.revokeObjectURL(url);
 
-        new Notice(`已导出`);
+        new Notice(`Exported`);
     }
 
     /**
-     * 卸载词典
+     * Export builtin dictionary (from memory)
+     */
+    private async exportBuiltinDictionary(pluginId: string, locale: string) {
+        // Get translator via global API
+        const translator = (window as any).i18nPlus?.getTranslator(pluginId);
+        if (!translator) {
+            new Notice('Unable to get translator instance');
+            return;
+        }
+
+        const dict = translator.getDictionary(locale) || {};
+
+        // Construct standard dictionary format (flat structure with $meta)
+        const exportData = {
+            $meta: {
+                pluginId: pluginId,
+                pluginVersion: '0.0.0', // Placeholder as we can't get plugin version
+                dictVersion: '1.0.0',
+                locale: locale,
+                author: 'I18n Plus Export',
+                description: `Exported builtin dictionary for ${locale}`
+            },
+            ...dict
+        };
+
+        const json = JSON.stringify(exportData, null, 2);
+        const blob = new Blob([json], { type: 'application/json' });
+
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${pluginId}.${locale}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        new Notice(`Exported builtin dictionary: ${locale}`);
+    }
+
+    /**
+     * Unload dictionary
      */
     private async unloadDictionary(dict: DictionaryFileInfo) {
         const manager = getI18nPlusManager();
         manager.unloadDictionary(dict.pluginId, dict.locale);
         await this.store.deleteDictionary(dict.pluginId, dict.locale);
-        new Notice(`已卸载`);
+        new Notice(`Unloaded`);
         this.onOpen();
     }
 

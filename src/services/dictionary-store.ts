@@ -1,10 +1,10 @@
 /**
  * I18n Plus - Dictionary Store
  * 
- * 本地词典存储服务，负责：
- * - 词典文件的持久化存储
- * - 词典的 CRUD 操作
- * - 启动时自动加载已安装的词典
+ * Local dictionary storage service, responsible for:
+ * - Persistent storage of dictionary files
+ * - Dictionary CRUD operations
+ * - Automatically loading installed dictionaries at startup
  */
 
 import { App, TFolder, TFile, normalizePath } from 'obsidian';
@@ -12,7 +12,7 @@ import type { Dictionary, ValidationResult } from '../framework/types';
 import type I18nPlusPlugin from '../main';
 import { getI18nPlusManager } from '../framework/global-api';
 
-/** 词典文件元信息 */
+/** Dictionary File Info */
 export interface DictionaryFileInfo {
     pluginId: string;
     locale: string;
@@ -22,9 +22,9 @@ export interface DictionaryFileInfo {
     pluginVersion?: string;
 }
 
-/** 词典存储配置 */
+/** Dictionary Store Config */
 export interface DictionaryStoreConfig {
-    /** 词典存储根目录（相对于 vault） */
+    /** Dictionary storage root path (relative to vault) */
     basePath: string;
 }
 
@@ -33,7 +33,7 @@ const DEFAULT_CONFIG: DictionaryStoreConfig = {
 };
 
 /**
- * 词典存储服务
+ * Dictionary Store Service
  */
 export class DictionaryStore {
     private app: App;
@@ -45,14 +45,14 @@ export class DictionaryStore {
     }
 
     /**
-     * 获取词典存储根目录路径
+     * Get dictionary storage root path
      */
     get basePath(): string {
         return normalizePath(this.plugin.settings.dictionaryPath || 'dictionaries');
     }
 
     /**
-     * 确保存储目录存在
+     * Ensure storage directory exists
      */
     async ensureDirectory(path: string): Promise<void> {
         const normalizedPath = normalizePath(path);
@@ -62,7 +62,7 @@ export class DictionaryStore {
             try {
                 await this.app.vault.createFolder(normalizedPath);
             } catch (error) {
-                // 忽略"文件夹已存在"错误（可能由并发创建引起）
+                // Ignore "Folder already exists" error (might be caused by concurrent creation)
                 if (!(error instanceof Error && error.message.includes('Folder already exists'))) {
                     throw error;
                 }
@@ -71,35 +71,35 @@ export class DictionaryStore {
     }
 
     /**
-     * 获取插件的词典目录路径
+     * Get plugin dictionary directory path
      */
     getPluginDictPath(pluginId: string): string {
         return normalizePath(`${this.basePath}/${pluginId}`);
     }
 
     /**
-     * 获取词典文件路径
+     * Get dictionary file path
      */
     getDictionaryFilePath(pluginId: string, locale: string): string {
         return normalizePath(`${this.basePath}/${pluginId}/${locale}.json`);
     }
 
     /**
-     * 保存词典到本地文件（支持覆盖）
+     * Save dictionary to local file (supports overwrite)
      */
     async saveDictionary(pluginId: string, locale: string, dict: Dictionary): Promise<void> {
         const dirPath = this.getPluginDictPath(pluginId);
         const filePath = this.getDictionaryFilePath(pluginId, locale);
 
-        // 确保目录存在
+        // Ensure directory exists
         await this.ensureDirectory(this.basePath);
         await this.ensureDirectory(dirPath);
 
-        // 写入文件（使用 adapter API 支持覆盖）
+        // Write file (using adapter API to support overwrite)
         const content = JSON.stringify(dict, null, 2);
 
         try {
-            // 直接使用 adapter.write 覆盖文件
+            // Use adapter.write directly to overwrite file
             await this.app.vault.adapter.write(filePath, content);
             console.info(`[i18n-plus] Saved dictionary: ${filePath}`);
         } catch (error) {
@@ -109,7 +109,7 @@ export class DictionaryStore {
     }
 
     /**
-     * 从本地文件加载词典
+     * Load dictionary from local file
      */
     async loadDictionary(pluginId: string, locale: string): Promise<Dictionary | null> {
         const filePath = this.getDictionaryFilePath(pluginId, locale);
@@ -129,7 +129,7 @@ export class DictionaryStore {
     }
 
     /**
-     * 删除本地词典文件
+     * Delete local dictionary file
      */
     async deleteDictionary(pluginId: string, locale: string): Promise<boolean> {
         const filePath = this.getDictionaryFilePath(pluginId, locale);
@@ -145,14 +145,14 @@ export class DictionaryStore {
     }
 
     /**
-     * 为指定插件加载所有本地词典
-     * @returns 加载成功的词典数量
+     * Load all local dictionaries for a specific plugin
+     * @returns Number of successfully loaded dictionaries
      */
     async loadDictionariesForPlugin(pluginId: string): Promise<number> {
         let count = 0;
         const manager = getI18nPlusManager();
 
-        // 确保插件已注册
+        // Ensure plugin is registered
         if (!manager.getTranslator(pluginId)) {
             return 0;
         }
@@ -182,7 +182,7 @@ export class DictionaryStore {
     }
 
     /**
-     * 列出所有已安装的词典
+     * List all installed dictionaries
      */
     async listAllDictionaries(): Promise<DictionaryFileInfo[]> {
         const result: DictionaryFileInfo[] = [];
@@ -192,19 +192,19 @@ export class DictionaryStore {
             return result;
         }
 
-        // 遍历插件目录
+        // Iterate through plugin directories
         for (const pluginFolder of baseFolder.children) {
             if (!(pluginFolder instanceof TFolder)) continue;
 
             const pluginId = pluginFolder.name;
 
-            // 遍历词典文件
+            // Iterate through dictionary files
             for (const file of pluginFolder.children) {
                 if (!(file instanceof TFile) || !file.name.endsWith('.json')) continue;
 
                 const locale = file.name.replace('.json', '');
 
-                // 尝试读取元信息
+                // Try to read meta info
                 let dictVersion: string | undefined;
                 let pluginVersion: string | undefined;
 
@@ -214,7 +214,7 @@ export class DictionaryStore {
                     dictVersion = dict.$meta?.dictVersion;
                     pluginVersion = dict.$meta?.pluginVersion;
                 } catch {
-                    // 忽略解析错误
+                    // Ignore parse errors
                 }
 
                 result.push({
@@ -232,7 +232,7 @@ export class DictionaryStore {
     }
 
     /**
-     * 列出指定插件的所有词典
+     * List all dictionaries for a specific plugin
      */
     async listPluginDictionaries(pluginId: string): Promise<DictionaryFileInfo[]> {
         const all = await this.listAllDictionaries();
@@ -240,15 +240,15 @@ export class DictionaryStore {
     }
 
     /**
-     * 从 JSON 文件导入词典
-     * 导入成功后自动切换到该语言
+     * Import dictionary from JSON file
+     * Automatically switch to that locale upon successful import
      */
     async importFromFile(file: File, pluginId: string): Promise<ValidationResult> {
         try {
             const content = await file.text();
             const dict = JSON.parse(content) as Dictionary;
 
-            // 获取语言标识
+            // Get locale identifier
             const locale = dict.$meta?.locale;
             if (!locale) {
                 return {
@@ -257,15 +257,15 @@ export class DictionaryStore {
                 };
             }
 
-            // 通过 i18n-plus API 加载到插件
+            // Load into plugin via i18n-plus API
             const manager = getI18nPlusManager();
             const result = manager.loadDictionary(pluginId, locale, dict);
 
             if (result.valid) {
-                // 保存到本地
+                // Save to local storage
                 await this.saveDictionary(pluginId, locale, dict);
 
-                // 自动切换到该语言，触发 UI 刷新
+                // Auto-switch to that locale, triggering UI refresh
                 manager.setGlobalLocale(locale);
                 console.info(`[i18n-plus] Auto-switched to locale: ${locale}`);
             }
@@ -280,7 +280,7 @@ export class DictionaryStore {
     }
 
     /**
-     * 导出词典为 JSON 文件
+     * Export dictionary as JSON file
      */
     async exportToBlob(pluginId: string, locale: string): Promise<Blob | null> {
         const dict = await this.loadDictionary(pluginId, locale);
@@ -291,7 +291,7 @@ export class DictionaryStore {
     }
 
     /**
-     * 启动时自动加载所有已安装的词典
+     * Automatically load all installed dictionaries at startup
      */
     async autoLoadDictionaries(): Promise<number> {
         const dictionaries = await this.listAllDictionaries();

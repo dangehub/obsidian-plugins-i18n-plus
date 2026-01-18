@@ -1,7 +1,7 @@
 /**
  * I18n Plus Framework - Global API
  * 
- * 全局 API 实现，暴露到 window.i18nPlus
+ * Global API Implementation, exposed to window.i18nPlus
  */
 
 import type {
@@ -14,7 +14,7 @@ import type {
 type EventCallback = (...args: unknown[]) => void;
 
 /**
- * I18n Plus 全局管理器
+ * I18n Plus Global Manager
  */
 export class I18nPlusManager implements I18nPlusAPI {
     readonly version = '0.1.0';
@@ -23,7 +23,7 @@ export class I18nPlusManager implements I18nPlusAPI {
     private readonly eventListeners: Map<string, Set<EventCallback>> = new Map();
 
     /**
-     * 注册插件的翻译器实例
+     * Register a plugin's translator instance
      */
     register(pluginId: string, translator: I18nTranslatorInterface): void {
         if (this.translators.has(pluginId)) {
@@ -33,12 +33,12 @@ export class I18nPlusManager implements I18nPlusAPI {
         this.translators.set(pluginId, translator);
         console.info(`[i18n-plus] Registered plugin: ${pluginId}`);
 
-        // 触发注册事件，让主插件可以自动加载词典
+        // Trigger registration event so the main plugin can auto-load dictionaries
         this.emit('plugin-registered', pluginId);
     }
 
     /**
-     * 注销插件的翻译器
+     * Unregister a plugin's translator
      */
     unregister(pluginId: string): void {
         if (this.translators.has(pluginId)) {
@@ -48,7 +48,7 @@ export class I18nPlusManager implements I18nPlusAPI {
     }
 
     /**
-     * 为指定插件加载词典
+     * Load dictionary for specific plugin
      */
     loadDictionary(pluginId: string, locale: string, dict: Dictionary): ValidationResult {
         const translator = this.translators.get(pluginId);
@@ -70,7 +70,7 @@ export class I18nPlusManager implements I18nPlusAPI {
     }
 
     /**
-     * 卸载指定插件的词典
+     * Unload dictionary for specific plugin
      */
     unloadDictionary(pluginId: string, locale: string): void {
         const translator = this.translators.get(pluginId);
@@ -82,14 +82,14 @@ export class I18nPlusManager implements I18nPlusAPI {
     }
 
     /**
-     * 获取已注册的插件列表
+     * Get registered plugins list
      */
     getRegisteredPlugins(): string[] {
         return Array.from(this.translators.keys());
     }
 
     /**
-     * 获取指定插件已加载的语言列表
+     * Get loaded locales list for specific plugin
      */
     getLoadedLocales(pluginId: string): string[] {
         const translator = this.translators.get(pluginId);
@@ -97,14 +97,14 @@ export class I18nPlusManager implements I18nPlusAPI {
     }
 
     /**
-     * 获取指定插件的翻译器
+     * Get translator for specific plugin
      */
     getTranslator(pluginId: string): I18nTranslatorInterface | undefined {
         return this.translators.get(pluginId);
     }
 
     /**
-     * 为所有已注册插件设置语言
+     * Set locale for all registered plugins
      */
     setGlobalLocale(locale: string): void {
         for (const translator of this.translators.values()) {
@@ -114,7 +114,7 @@ export class I18nPlusManager implements I18nPlusAPI {
     }
 
     /**
-     * 监听事件
+     * Listen to events
      */
     on(event: string, callback: EventCallback): void {
         if (!this.eventListeners.has(event)) {
@@ -124,7 +124,7 @@ export class I18nPlusManager implements I18nPlusAPI {
     }
 
     /**
-     * 移除事件监听
+     * Remove event listener
      */
     off(event: string, callback: EventCallback): void {
         const listeners = this.eventListeners.get(event);
@@ -134,7 +134,7 @@ export class I18nPlusManager implements I18nPlusAPI {
     }
 
     /**
-     * 触发事件
+     * Emit event
      */
     private emit(event: string, ...args: unknown[]): void {
         const listeners = this.eventListeners.get(event);
@@ -150,11 +150,11 @@ export class I18nPlusManager implements I18nPlusAPI {
     }
 }
 
-// 单例实例
+// Singleton Instance
 let instance: I18nPlusManager | null = null;
 
 /**
- * 获取或创建 I18nPlusManager 实例
+ * Get or create I18nPlusManager instance
  */
 export function getI18nPlusManager(): I18nPlusManager {
     if (!instance) {
@@ -164,17 +164,17 @@ export function getI18nPlusManager(): I18nPlusManager {
 }
 
 /**
- * 初始化全局 API（由 i18n-plus 插件调用）
+ * Initialize Global API (called by i18n-plus plugin)
  */
 export function initGlobalAPI(): I18nPlusManager {
     const manager = getI18nPlusManager();
 
-    // 暴露到全局
+    // Expose to global
     if (typeof window !== 'undefined') {
         window.i18nPlus = manager;
         console.info(`[i18n-plus] Global API initialized (v${manager.version})`);
 
-        // 广播 ready 事件，让其他插件可以重新注册
+        // Broadcast ready event so other plugins can re-register
         window.dispatchEvent(new CustomEvent('i18n-plus:ready', {
             detail: { version: manager.version }
         }));
@@ -184,7 +184,7 @@ export function initGlobalAPI(): I18nPlusManager {
 }
 
 /**
- * 销毁全局 API（插件卸载时调用）
+ * Destroy Global API (called when plugin unloaded)
  */
 export function destroyGlobalAPI(): void {
     if (typeof window !== 'undefined' && window.i18nPlus) {

@@ -1,202 +1,208 @@
 /**
  * I18n Plus Framework - Type Definitions
  * 
- * 国际化框架核心类型定义
+ * Core type definitions for the internationalization framework
  */
 
 /**
- * 词典元信息
+ * Dictionary Meta Information
  */
 export interface DictionaryMeta {
-    /** 语言标识 (BCP 47)，如 "zh-CN", "en" */
+    /** Locale identifier (BCP 47), e.g., "zh-CN", "en" */
     locale: string;
-    /** 词典版本（翻译迭代版本） */
+    /** Dictionary version (translation iteration version) */
     dictVersion: string;
-    /** 适配的插件版本范围，如 ">=1.0.0" */
+    /** Adapted plugin version range, e.g., ">=1.0.0" */
     pluginVersion?: string;
-    /** 贡献者列表 */
+    /** List of authors */
     authors?: string[];
 }
 
 /**
- * 词典数据结构
+ * Dictionary Data Structure
  */
 export interface Dictionary {
-    /** 元信息（加载外部词典时必填） */
+    /** Meta information (required when loading external dictionaries) */
     $meta?: DictionaryMeta;
-    /** 翻译条目 */
+    /** Translation entries */
     [key: string]: string | DictionaryMeta | undefined;
 }
 
 /**
- * 词典校验错误项
+ * Dictionary Validation Error Item
  */
 export interface ValidationError {
-    /** 错误对应的 key */
+    /** The key corresponding to the error */
     key: string;
-    /** 错误信息 */
+    /** Error message */
     message: string;
 }
 
 /**
- * 词典校验结果
+ * Dictionary Validation Result
  */
 export interface ValidationResult {
-    /** 是否通过校验 */
+    /** Whether validation passed */
     valid: boolean;
-    /** 错误列表 */
+    /** List of errors */
     errors?: ValidationError[];
-    /** 警告列表（非致命问题） */
+    /** List of warnings (non-fatal issues) */
     warnings?: ValidationError[];
 }
 
 /**
- * 翻译器配置选项
+ * Translator Options
  */
 export interface TranslatorOptions<T extends Dictionary = Dictionary> {
-    /** 插件 ID */
+    /** Plugin ID */
     pluginId: string;
-    /** 基准语言标识 */
+    /** Base locale identifier */
     baseLocale: string;
-    /** 基准词典（硬编码在插件中的默认翻译） */
+    /** Base dictionary (hardcoded default translations in the plugin) */
     baseDictionary: T;
-    /** 当前语言（默认跟随 Obsidian 设置） */
+    /** Current locale (defaults to following Obsidian settings) */
     currentLocale?: string;
-    /** 词典校验失败时的回调 */
+    /** Callback when dictionary validation fails */
     onValidationError?: (result: ValidationResult) => void;
 }
 
 /**
- * I18n Plus 全局 API
+ * I18n Plus Global API
  */
 export interface I18nPlusAPI {
-    /** API 版本 */
+    /** API Version */
     readonly version: string;
 
     /**
-     * 注册插件的翻译器实例
-     * @param pluginId 插件 ID
-     * @param translator 翻译器实例
+     * Register a plugin's translator instance
+     * @param pluginId Plugin ID
+     * @param translator Translator instance
      */
     register(pluginId: string, translator: I18nTranslatorInterface): void;
 
     /**
-     * 注销插件的翻译器
-     * @param pluginId 插件 ID
+     * Unregister a plugin's translator
+     * @param pluginId Plugin ID
      */
     unregister(pluginId: string): void;
 
     /**
-     * 为指定插件加载词典
-     * @param pluginId 插件 ID
-     * @param locale 语言标识
-     * @param dict 词典数据
-     * @returns 校验结果
+     * Load dictionary for a specific plugin
+     * @param pluginId Plugin ID
+     * @param locale Locale identifier
+     * @param dict Dictionary data
+     * @returns Validation result
      */
     loadDictionary(pluginId: string, locale: string, dict: Dictionary): ValidationResult;
 
     /**
-     * 卸载指定插件的词典
-     * @param pluginId 插件 ID
-     * @param locale 语言标识
+     * Unload dictionary for a specific plugin
+     * @param pluginId Plugin ID
+     * @param locale Locale identifier
      */
     unloadDictionary(pluginId: string, locale: string): void;
 
     /**
-     * 获取已注册的插件列表
+     * Get list of registered plugins
      */
     getRegisteredPlugins(): string[];
 
     /**
-     * 获取指定插件已加载的语言列表
-     * @param pluginId 插件 ID
+     * Get list of loaded locales for a specific plugin
+     * @param pluginId Plugin ID
      */
     getLoadedLocales(pluginId: string): string[];
 
     /**
-     * 获取指定插件的翻译器
-     * @param pluginId 插件 ID
+     * Get translator for a specific plugin
+     * @param pluginId Plugin ID
      */
     getTranslator(pluginId: string): I18nTranslatorInterface | undefined;
 
     /**
-     * 监听事件
-     * @param event 事件名
-     * @param callback 回调函数
+     * Listen to events
+     * @param event Event name
+     * @param callback Callback function
      */
     on(event: 'locale-changed' | 'dictionary-loaded' | 'dictionary-unloaded' | 'plugin-registered', callback: (...args: unknown[]) => void): void;
 
     /**
-     * 移除事件监听
+     * Remove event listener
      */
     off(event: string, callback: (...args: unknown[]) => void): void;
 }
 
 /**
- * 翻译器接口
+ * Translator Interface
  */
 export interface I18nTranslatorInterface {
-    /** 插件 ID */
+    /** Plugin ID */
     readonly pluginId: string;
-    /** 基准语言 */
+    /** Base locale */
     readonly baseLocale: string;
-    /** 当前语言 */
+    /** Current locale */
     currentLocale: string;
 
     /**
-     * 翻译函数
-     * @param key 翻译 key
-     * @param params 插值参数
+     * Translation function
+     * @param key Translation key
+     * @param params Interpolation parameters, or options object containing context
      */
-    t(key: string, params?: Record<string, string | number>): string;
+    t(key: string, params?: Record<string, string | number> | { context?: string;[key: string]: any }): string;
 
     /**
-     * 加载词典
-     * @param locale 语言标识
-     * @param dict 词典数据
+     * Load dictionary
+     * @param locale Locale identifier
+     * @param dict Dictionary data
      */
     loadDictionary(locale: string, dict: Dictionary): ValidationResult;
 
     /**
-     * 卸载词典
-     * @param locale 语言标识
+     * Unload dictionary
+     * @param locale Locale identifier
      */
     unloadDictionary(locale: string): void;
 
     /**
-     * 设置当前语言
-     * @param locale 语言标识
+     * Set current locale
+     * @param locale Locale identifier
      */
     setLocale(locale: string): void;
 
     /**
-     * 获取当前语言
+     * Get current locale
      */
     getLocale(): string;
 
     /**
-     * 获取已加载的语言列表（内置 + 外部）
+     * Get list of loaded locales (builtin + external)
      */
     getLoadedLocales(): string[];
 
     /**
-     * 获取内置语言列表（插件自带的翻译）
+     * Get list of builtin locales (translations bundled with the plugin)
      */
     getBuiltinLocales(): string[];
 
     /**
-     * 获取外部导入的语言列表
+     * Get list of external imported locales
      */
     getExternalLocales(): string[];
 
     /**
-     * 校验词典格式
-     * @param dict 待校验的词典
+     * Get dictionary data for specific locale
+     * @param locale Locale identifier
+     */
+    getDictionary(locale: string): Dictionary | undefined;
+
+    /**
+     * Validate dictionary format
+     * @param dict Dictionary to validate
      */
     validateDictionary(dict: unknown): ValidationResult;
 }
 
-// 全局类型声明
+// Global type declaration
 declare global {
     interface Window {
         i18nPlus?: I18nPlusAPI;

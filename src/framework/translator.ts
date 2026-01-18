@@ -1,7 +1,7 @@
 /**
  * I18n Plus Framework - I18nTranslator
  * 
- * 翻译器核心实现
+ * Translator core implementation
  */
 
 import type {
@@ -14,13 +14,13 @@ import type {
 } from './types';
 
 /**
- * I18n 翻译器
+ * I18n Translator
  * 
- * 负责管理单个插件的国际化翻译，支持：
- * - 动态加载/卸载词典
- * - 词典格式校验
- * - 缺失条目自动回退
- * - 参数插值
+ * Responsible for managing internationalization translations for a single plugin, supports:
+ * - Dynamic dictionary loading/unloading
+ * - Dictionary format validation
+ * - Automatic fallback for missing entries
+ * - Parameter interpolation
  */
 export class I18nTranslator<T extends Dictionary = Dictionary> implements I18nTranslatorInterface {
     readonly pluginId: string;
@@ -38,7 +38,7 @@ export class I18nTranslator<T extends Dictionary = Dictionary> implements I18nTr
         this.baseDictionary = options.baseDictionary;
         this.onValidationError = options.onValidationError;
 
-        // 将基准词典也存入 map
+        // Store base dictionary in map
         this.dictionaries.set(this.baseLocale, this.baseDictionary);
     }
 
@@ -51,39 +51,64 @@ export class I18nTranslator<T extends Dictionary = Dictionary> implements I18nTr
     }
 
     /**
-     * 翻译函数
-     * @param key 翻译 key
-     * @param params 插值参数，支持 {name} 格式
+     * Translation function
+     * @param key Translation key
+     * @param params Interpolation parameters, supports {name} format
      */
-    t(key: keyof T | string, params?: Record<string, string | number>): string {
+    t(key: keyof T | string, params?: Record<string, string | number> | { context?: string;[key: string]: any }): string {
         const k = key as string;
+        const context = params?.context;
 
-        // 1. 尝试从当前语言的词典获取
+        // Context lookup logic
+        // If context exists, prioritize "Key_Context"
+        const lookupKeys: string[] = [];
+        if (context) {
+            lookupKeys.push(`${k}_${context}`);
+        }
+        lookupKeys.push(k);
+
         const currentDict = this.dictionaries.get(this._currentLocale);
-        let value = currentDict?.[k];
+        const baseDict = this.baseDictionary as Dictionary;
 
-        // 2. 如果当前语言没有，回退到基准词典
-        if (value === undefined || typeof value !== 'string') {
-            value = (this.baseDictionary as Dictionary)[k];
+        let template: string | undefined;
+
+        // 1. Iterate to find Key
+        for (const lookupKey of lookupKeys) {
+            // Try current locale
+            if (currentDict && typeof currentDict[lookupKey] === 'string') {
+                template = currentDict[lookupKey];
+                break;
+            }
+            // Try base locale
+            if (baseDict && typeof baseDict[lookupKey] === 'string') {
+                template = baseDict[lookupKey];
+                break;
+            }
         }
 
-        // 3. 如果基准词典也没有，返回 key 本身（便于调试）
-        if (value === undefined || typeof value !== 'string') {
-            console.warn(`[i18n-plus] Missing translation for key: "${k}" in plugin: ${this.pluginId}`);
+        // 2. If not found in any locale
+        // If context exists, fallback to the original key without context suffix
+        // Note: If no translation found, we return the original key directly
+        if (template === undefined) {
+            console.warn(`[i18n-plus] Missing translation for key: "${k}"${context ? ` (context: ${context})` : ''} in plugin: ${this.pluginId}`);
             return k;
         }
 
-        // 4. 参数插值
+        // 3. Parameter Interpolation
         if (params) {
-            return this.interpolate(value, params);
+            // Filter out context parameter to avoid pollution
+            const { context: _ctx, ...interpolationParams } = params as any;
+            if (Object.keys(interpolationParams).length > 0) {
+                return this.interpolate(template, interpolationParams);
+            }
         }
 
-        return value;
+        return template;
     }
 
     /**
-     * 参数插值
-     * 支持 {name} 和 {{name}} 两种格式
+     * Parameter Interpolation
+     * Supports {name} and {{name}} formats
      */
     private interpolate(text: string, params: Record<string, string | number>): string {
         return text.replace(/\{\{?(\w+)\}?\}/g, (match, key) => {
@@ -93,25 +118,25 @@ export class I18nTranslator<T extends Dictionary = Dictionary> implements I18nTr
     }
 
     /**
-     * 加载词典
+     * Load dictionary
      */
     loadDictionary(locale: string, dict: Dictionary): ValidationResult {
-        // 校验词典格式
+        // Validate dictionary format
         const result = this.validateDictionary(dict);
 
         if (!result.valid) {
-            // 触发错误回调
+            // Trigger error callback
             this.onValidationError?.(result);
             console.error(`[i18n-plus] Dictionary validation failed for ${this.pluginId}/${locale}:`, result.errors);
             return result;
         }
 
-        // 如果有警告，也触发回调但不阻止加载
+        // Trigger callback for warnings if any, but do not block loading
         if (result.warnings && result.warnings.length > 0) {
             console.warn(`[i18n-plus] Dictionary loaded with warnings for ${this.pluginId}/${locale}:`, result.warnings);
         }
 
-        // 存储词典
+        // Store dictionary
         this.dictionaries.set(locale, dict);
 
         console.info(`[i18n-plus] Loaded dictionary: ${this.pluginId}/${locale}`);
@@ -119,10 +144,10 @@ export class I18nTranslator<T extends Dictionary = Dictionary> implements I18nTr
     }
 
     /**
-     * 卸载词典
+     * Unload dictionary
      */
     unloadDictionary(locale: string): void {
-        // 不允许卸载基准词典
+        // Cannot unload base dictionary
         if (locale === this.baseLocale) {
             console.warn(`[i18n-plus] Cannot unload base dictionary: ${locale}`);
             return;
@@ -132,7 +157,7 @@ export class I18nTranslator<T extends Dictionary = Dictionary> implements I18nTr
             this.dictionaries.delete(locale);
             console.info(`[i18n-plus] Unloaded dictionary: ${this.pluginId}/${locale}`);
 
-            // 如果卸载的是当前语言，回退到基准语言
+            // If unloading current locale, revert to base locale
             if (this._currentLocale === locale) {
                 this._currentLocale = this.baseLocale;
                 console.info(`[i18n-plus] Locale reset to base: ${this.baseLocale}`);
@@ -141,48 +166,56 @@ export class I18nTranslator<T extends Dictionary = Dictionary> implements I18nTr
     }
 
     /**
-     * 设置当前语言
+     * Set current locale
      */
     setLocale(locale: string): void {
         this._currentLocale = locale;
     }
 
     /**
-     * 获取当前语言
+     * Get current locale
      */
     getLocale(): string {
         return this._currentLocale;
     }
 
     /**
-     * 获取已加载的语言列表（内置 + 外部）
+     * Get loaded locales list (builtin + external)
      */
     getLoadedLocales(): string[] {
         return Array.from(this.dictionaries.keys());
     }
 
     /**
-     * 获取内置语言列表（只有 baseLocale）
+     * Get builtin locales list (only baseLocale)
      */
     getBuiltinLocales(): string[] {
         return [this.baseLocale];
     }
 
     /**
-     * 获取外部导入的语言列表
+     * Get external locales list
      */
     getExternalLocales(): string[] {
         return Array.from(this.dictionaries.keys()).filter(l => l !== this.baseLocale);
     }
 
+    getDictionary(locale: string): Dictionary | undefined {
+        if (locale === this.baseLocale) {
+            return this.baseDictionary;
+        }
+        return this.dictionaries.get(locale);
+    }
+
+
     /**
-     * 校验词典格式
+     * Validate dictionary format
      */
     validateDictionary(dict: unknown): ValidationResult {
         const errors: ValidationError[] = [];
         const warnings: ValidationError[] = [];
 
-        // 1. 基础类型检查
+        // 1. Basic type check
         if (!dict || typeof dict !== 'object') {
             errors.push({ key: '$root', message: 'Dictionary must be an object' });
             return { valid: false, errors };
@@ -190,14 +223,14 @@ export class I18nTranslator<T extends Dictionary = Dictionary> implements I18nTr
 
         const d = dict as Record<string, unknown>;
 
-        // 2. 检查 $meta（如果存在）
+        // 2. Check $meta (if exists)
         if (d.$meta !== undefined) {
             const meta = d.$meta as Partial<DictionaryMeta>;
 
             if (typeof meta !== 'object') {
                 errors.push({ key: '$meta', message: '$meta must be an object' });
             } else {
-                // locale 是加载外部词典时的必填项
+                // locale is required when loading external dictionaries
                 if (!meta.locale || typeof meta.locale !== 'string') {
                     warnings.push({ key: '$meta.locale', message: 'Missing or invalid $meta.locale' });
                 }
@@ -208,23 +241,23 @@ export class I18nTranslator<T extends Dictionary = Dictionary> implements I18nTr
             }
         }
 
-        // 3. 检查翻译条目
+        // 3. Check translation entries
         const baseKeys = Object.keys(this.baseDictionary).filter(k => k !== '$meta');
         const dictKeys = Object.keys(d).filter(k => k !== '$meta');
 
-        // 检查是否有未知的 key（可能是拼写错误）
+        // Check for unknown keys (typos)
         for (const key of dictKeys) {
             if (!baseKeys.includes(key)) {
                 warnings.push({ key, message: `Unknown key "${key}" not in base dictionary` });
             }
 
-            // 值必须是字符串
+            // Value must be a string
             if (typeof d[key] !== 'string' && key !== '$meta') {
                 errors.push({ key, message: `Value for "${key}" must be a string, got ${typeof d[key]}` });
             }
         }
 
-        // 检查缺失的 key
+        // Check for missing keys
         for (const key of baseKeys) {
             if (!dictKeys.includes(key)) {
                 warnings.push({ key, message: `Missing translation for "${key}"` });
@@ -240,7 +273,7 @@ export class I18nTranslator<T extends Dictionary = Dictionary> implements I18nTr
 }
 
 /**
- * 创建翻译器的工厂函数
+ * Factory function to create translator
  */
 export function createTranslator<T extends Dictionary>(
     options: TranslatorOptions<T>
