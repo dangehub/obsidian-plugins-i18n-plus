@@ -19,11 +19,52 @@ export default class I18nPlusPlugin extends Plugin {
 
 		await this.loadSettings();
 
-		// 初始化全局 API
-		initGlobalAPI();
-
-		// 初始化词典存储
+		// 初始化词典存储 (必须在 initGlobalAPI 之前，因为事件监听器需要它)
 		this.dictionaryStore = new DictionaryStore(this.app, this);
+
+		// 先获取 manager 实例并设置事件监听器
+		// 这样当 initGlobalAPI 触发 i18n-plus:ready 事件时，我们能捕获到插件注册
+		const manager = getI18nPlusManager();
+
+		// 监听插件注册事件，自动加载该插件的词典并应用语言设置
+		manager.on('plugin-registered', async (pluginId: unknown) => {
+			if (typeof pluginId === 'string') {
+				if (this.settings.debugMode) {
+					console.log(`[i18n-plus] plugin-registered event for: ${pluginId}`);
+				}
+				// 加载该插件的词典
+				const count = await this.dictionaryStore.loadDictionariesForPlugin(pluginId);
+				if (this.settings.debugMode || count > 0) {
+					console.info(`[i18n-plus] Loaded ${count} dictionaries for plugin: ${pluginId}`);
+				}
+
+				// 如果有全局语言设置，则应用到该插件
+				if (this.settings.currentLocale) {
+					const translator = manager.getTranslator(pluginId);
+					// 仅当插件当前语言与全局设置不一致时才切换，避免重复设置
+					if (translator && translator.getLocale() !== this.settings.currentLocale) {
+						try {
+							translator.setLocale(this.settings.currentLocale);
+							console.info(`[i18n-plus] Applied locale preference to ${pluginId}: ${this.settings.currentLocale}`);
+						} catch (e) {
+							console.warn(`[i18n-plus] Failed to apply locale to ${pluginId}`, e);
+						}
+					}
+				}
+			}
+		});
+
+		// 监听语言变化事件，保存到设置
+		manager.on('locale-changed', async (locale: unknown) => {
+			if (typeof locale === 'string' && locale !== this.settings.currentLocale) {
+				this.settings.currentLocale = locale;
+				await this.saveSettings();
+				console.info(`[i18n-plus] Saved locale preference: ${locale}`);
+			}
+		});
+
+		// 初始化全局 API (这会触发 i18n-plus:ready 事件，导致其他插件注册)
+		initGlobalAPI();
 
 		// 添加设置面板
 		this.addSettingTab(new I18nPlusSettingTab(this.app, this));
@@ -63,41 +104,6 @@ export default class I18nPlusPlugin extends Plugin {
 		// 添加 Ribbon 图标 - 点击打开词典管理器
 		this.addRibbonIcon('languages', 'I18n Plus 词典管理器', () => {
 			new DictionaryManagerModal(this.app, this).open();
-		});
-
-		// 监听语言变化事件，保存到设置
-		const manager = getI18nPlusManager();
-		manager.on('locale-changed', async (locale: unknown) => {
-			if (typeof locale === 'string' && locale !== this.settings.currentLocale) {
-				this.settings.currentLocale = locale;
-				await this.saveSettings();
-				console.info(`[i18n-plus] Saved locale preference: ${locale}`);
-			}
-		});
-
-		// 监听插件注册事件，自动加载该插件的词典并应用语言设置
-		manager.on('plugin-registered', async (pluginId: unknown) => {
-			if (typeof pluginId === 'string') {
-				// 加载该插件的词典
-				const count = await this.dictionaryStore.loadDictionariesForPlugin(pluginId);
-				if (count > 0) {
-					// console.info 这里可以保留，或者仅在 debug 模式输出
-				}
-
-				// 如果有全局语言设置，则应用到该插件
-				if (this.settings.currentLocale) {
-					const translator = manager.getTranslator(pluginId);
-					// 仅当插件当前语言与全局设置不一致时才切换，避免重复设置
-					if (translator && translator.getLocale() !== this.settings.currentLocale) {
-						try {
-							translator.setLocale(this.settings.currentLocale);
-							console.info(`[i18n-plus] Applied locale preference to ${pluginId}: ${this.settings.currentLocale}`);
-						} catch (e) {
-							console.warn(`[i18n-plus] Failed to apply locale to ${pluginId}`, e);
-						}
-					}
-				}
-			}
 		});
 
 		// 延迟自动加载已安装的词典（等待其他插件注册）
