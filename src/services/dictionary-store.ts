@@ -223,8 +223,8 @@ export class DictionaryStore {
                         const dict = JSON.parse(content) as Dictionary;
                         dictVersion = dict.$meta?.dictVersion;
                         pluginVersion = dict.$meta?.pluginVersion;
-                    } catch {
-                        // Ignore parse errors
+                    } catch (e) {
+                        console.warn(`[i18n-plus] Skipped invalid dictionary file: ${filePath}`, e);
                     }
 
                     result.push({
