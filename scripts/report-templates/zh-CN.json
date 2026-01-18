@@ -1,0 +1,26 @@
+{
+    "title": "I18n 迁移报告",
+    "stats": {
+        "total": "总共转换",
+        "low": "低风险",
+        "medium": "中风险",
+        "high": "高风险"
+    },
+    "sections": {
+        "highRisk": "高风险项 (需人工复核)",
+        "mediumRisk": "中风险项",
+        "lowRisk": "低风险项"
+    },
+    "riskTypes": {
+        "dom_mixed": "DOM 混合 + 占位符",
+        "string_concat": "字符串拼接"
+    },
+    "warnings": {
+        "innerHTML": "使用 innerHTML 可能影响事件绑定"
+    },
+    "notes": {
+        "mediumRiskNote": "共 {count} 处字符串拼接已自动合并，建议快速检查。",
+        "lowRiskNote": "共 {count} 处简单字符串已自动替换，无需复核。",
+        "generatedAt": "生成时间"
+    }
+}

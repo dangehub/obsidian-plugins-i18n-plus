@@ -178,5 +178,66 @@ module.exports = function (file, api) {
         }
     });
 
+    // 5. Replace string arguments in .append() calls
+    // Pattern: desc.append("text", el.createEl(...), "text2")
+    root.find(j.CallExpression, {
+        callee: { property: { name: 'append' } }
+    }).forEach(path => {
+        const args = path.value.arguments;
+        let hasDomElement = false;
+        let hasString = false;
+
+        // First pass: detect if this append has mixed DOM + strings
+        args.forEach(arg => {
+            if (arg.type === 'StringLiteral' || (arg.type === 'BinaryExpression' && flattenBinaryString(arg) !== null)) {
+                hasString = true;
+            }
+            if (arg.type === 'CallExpression' && arg.callee && arg.callee.property && arg.callee.property.name === 'createEl') {
+                hasDomElement = true;
+            }
+        });
+
+        // Track risk level
+        if (hasString && hasDomElement) {
+            stats.highRisk = (stats.highRisk || 0) + 1;
+            stats.highRiskLocations = stats.highRiskLocations || [];
+            stats.highRiskLocations.push({
+                file: file.path,
+                line: path.value.loc ? path.value.loc.start.line : 'unknown',
+                type: 'dom_mixed'
+            });
+        }
+
+        // Second pass: replace string arguments
+        args.forEach((arg, index) => {
+            const text = flattenBinaryString(arg);
+            if (text !== null && !shouldIgnore(text)) {
+                trackString(text);
+                args[index] = createTCall(text, path);
+                stats.replaced++;
+                if (hasDomElement) {
+                    // Mark as medium risk if part of DOM-mixed pattern
+                } else {
+                    stats.lowRisk = (stats.lowRisk || 0) + 1;
+                }
+            }
+        });
+    });
+
+    // Output transformation log for report generation
+    if (process.env.I18N_GENERATE_LOG === 'true') {
+        const logData = {
+            file: file.path,
+            stats: {
+                replaced: stats.replaced,
+                lowRisk: stats.lowRisk || 0,
+                highRisk: stats.highRisk || 0,
+                highRiskLocations: stats.highRiskLocations || []
+            },
+            strings: Object.keys(stats.strings)
+        };
+        console.log('__I18N_LOG__' + JSON.stringify(logData));
+    }
+
     return root.toSource();
 };

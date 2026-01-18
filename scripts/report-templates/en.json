@@ -1,0 +1,26 @@
+{
+    "title": "I18n Migration Report",
+    "stats": {
+        "total": "Total Transformations",
+        "low": "Low Risk",
+        "medium": "Medium Risk",
+        "high": "High Risk"
+    },
+    "sections": {
+        "highRisk": "High Risk Items (Requires Manual Review)",
+        "mediumRisk": "Medium Risk Items",
+        "lowRisk": "Low Risk Items"
+    },
+    "riskTypes": {
+        "dom_mixed": "DOM Mixed + Placeholder",
+        "string_concat": "String Concatenation"
+    },
+    "warnings": {
+        "innerHTML": "Using innerHTML may affect event bindings"
+    },
+    "notes": {
+        "mediumRiskNote": "{count} string concatenations have been auto-merged. Quick review recommended.",
+        "lowRiskNote": "{count} simple strings have been auto-replaced. No review needed.",
+        "generatedAt": "Generated at"
+    }
+}
