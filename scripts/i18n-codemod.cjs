@@ -145,6 +145,80 @@ module.exports = function (file, api) {
         return null;
     }
 
+    // Helper: Flatten binary expression with placeholders for dynamic parts
+    // Returns { text: "static {p0} more {p1}", params: [dynamicNode0, dynamicNode1] } or null
+    function flattenBinaryWithPlaceholders(node) {
+        const parts = [];      // Array of { type: 'string'|'dynamic', value: string|node }
+        let placeholderIndex = 0;
+
+        function traverse(n) {
+            if (n.type === 'StringLiteral') {
+                parts.push({ type: 'string', value: n.value });
+                return true;
+            }
+            if (n.type === 'BinaryExpression' && n.operator === '+') {
+                return traverse(n.left) && traverse(n.right);
+            }
+            // This is a dynamic expression (function call, variable, etc.)
+            parts.push({ type: 'dynamic', value: n, placeholder: `value${placeholderIndex++}` });
+            return true;
+        }
+
+        if (!traverse(node)) return null;
+
+        // Must have at least one string part and one dynamic part to be useful
+        const hasString = parts.some(p => p.type === 'string');
+        const hasDynamic = parts.some(p => p.type === 'dynamic');
+
+        if (!hasString) return null;  // No strings to translate
+
+        // Build the result
+        let text = '';
+        const params = [];
+
+        for (const part of parts) {
+            if (part.type === 'string') {
+                text += part.value;
+            } else {
+                text += `{${part.placeholder}}`;
+                params.push({ name: part.placeholder, node: part.value });
+            }
+        }
+
+        return { text, params, hasDynamic };
+    }
+
+    // Helper: Generate t() call with interpolation parameters
+    function createTCallWithParams(text, params, path) {
+        // Skip if not inside a class
+        if (path && !isInsideClass(path)) {
+            stats.skippedStandalone = (stats.skippedStandalone || 0) + 1;
+            stats.skippedLocations = stats.skippedLocations || [];
+            stats.skippedLocations.push({
+                file: file.path,
+                line: path.value.loc ? path.value.loc.start.line : 'unknown',
+                text: text.substring(0, 50) + (text.length > 50 ? '...' : ''),
+                type: 'standalone_function'
+            });
+            return null;
+        }
+
+        let object = j.thisExpression();
+        if (path && shouldUsePluginT(path)) {
+            object = j.memberExpression(j.thisExpression(), j.identifier('plugin'));
+        }
+
+        // Build the params object
+        const paramsObj = j.objectExpression(
+            params.map(p => j.property('init', j.identifier(p.name), p.node))
+        );
+
+        return j.callExpression(
+            j.memberExpression(object, j.identifier('t')),
+            [j.stringLiteral(text), paramsObj]
+        );
+    }
+
     // 1. Replace new Notice("...")
     root.find(j.NewExpression, {
         callee: { name: 'Notice' }
@@ -171,15 +245,26 @@ module.exports = function (file, api) {
             callee: { property: { name: methodName } }
         }).forEach(path => {
             const args = path.value.arguments;
-            if (args.length > 0) {
+            if (args.length > 0 && args.length <= 1) { // Only replace when there's exactly 1 argument
+                // First, try pure string flattening
                 const text = flattenBinaryString(args[0]);
                 if (text !== null && !shouldIgnore(text)) {
                     trackString(text);
-                    if (args.length <= 1) { // Only replace when there are no extra arguments (avoid setDesc(text, frag) etc.)
-                        const tCall = createTCall(text, path);
+                    const tCall = createTCall(text, path);
+                    if (tCall) {
+                        args[0] = tCall;
+                        stats.replaced++;
+                    }
+                } else if (args[0].type === 'BinaryExpression') {
+                    // Try dynamic placeholder approach for mixed string + expression concatenation
+                    const result = flattenBinaryWithPlaceholders(args[0]);
+                    if (result && result.hasDynamic && !shouldIgnore(result.text)) {
+                        trackString(result.text);
+                        const tCall = createTCallWithParams(result.text, result.params, path);
                         if (tCall) {
                             args[0] = tCall;
                             stats.replaced++;
+                            stats.dynamicInterpolation = (stats.dynamicInterpolation || 0) + 1;
                         }
                     }
                 }
