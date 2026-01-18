@@ -137,14 +137,20 @@ module.exports = function (file, api) {
                     )
                 );
 
-                // this.t = this.i18n.t;
+                // this.t = this.i18n.t.bind(this.i18n);
                 const bindStmt = j.expressionStatement(
                     j.assignmentExpression(
                         '=',
                         j.memberExpression(j.thisExpression(), j.identifier('t')),
-                        j.memberExpression(
-                            j.memberExpression(j.thisExpression(), j.identifier('i18n')),
-                            j.identifier('t')
+                        j.callExpression(
+                            j.memberExpression(
+                                j.memberExpression(
+                                    j.memberExpression(j.thisExpression(), j.identifier('i18n')),
+                                    j.identifier('t')
+                                ),
+                                j.identifier('bind')
+                            ),
+                            [j.memberExpression(j.thisExpression(), j.identifier('i18n'))]
                         )
                     )
                 );
