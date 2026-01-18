@@ -77,8 +77,47 @@ module.exports = function (file, api) {
         return false;
     }
 
-    // Helper: Generate t() call node
+    // Helper: Check if path is inside a class (not a standalone function)
+    function isInsideClass(path) {
+        let current = path;
+        while (current) {
+            if (current.node.type === 'ClassDeclaration' || current.node.type === 'ClassExpression') {
+                return true;
+            }
+            // If we hit a standalone function before a class, we're not in a class context
+            if (current.node.type === 'FunctionDeclaration' ||
+                (current.node.type === 'FunctionExpression' && current.parent && current.parent.node.type !== 'MethodDefinition' && current.parent.node.type !== 'ClassMethod') ||
+                current.node.type === 'ArrowFunctionExpression' && current.parent && current.parent.node.type === 'VariableDeclarator') {
+                // Check if this function is at module level (not inside a class)
+                let checkCurrent = current.parent;
+                while (checkCurrent) {
+                    if (checkCurrent.node.type === 'ClassDeclaration' || checkCurrent.node.type === 'ClassExpression') {
+                        return true;
+                    }
+                    checkCurrent = checkCurrent.parent;
+                }
+                return false;
+            }
+            current = current.parent;
+        }
+        return false;
+    }
+
+    // Helper: Generate t() call node, returns null if not in class context
     function createTCall(text, path) {
+        // Skip if not inside a class - these need manual handling
+        if (path && !isInsideClass(path)) {
+            stats.skippedStandalone = (stats.skippedStandalone || 0) + 1;
+            stats.skippedLocations = stats.skippedLocations || [];
+            stats.skippedLocations.push({
+                file: file.path,
+                line: path.value.loc ? path.value.loc.start.line : 'unknown',
+                text: text.substring(0, 50) + (text.length > 50 ? '...' : ''),
+                type: 'standalone_function'
+            });
+            return null;
+        }
+
         let object = j.thisExpression();
 
         if (path && shouldUsePluginT(path)) {
@@ -115,8 +154,11 @@ module.exports = function (file, api) {
             const text = flattenBinaryString(args[0]);
             if (text !== null && !shouldIgnore(text)) {
                 trackString(text);
-                args[0] = createTCall(text, path);
-                stats.replaced++;
+                const tCall = createTCall(text, path);
+                if (tCall) {
+                    args[0] = tCall;
+                    stats.replaced++;
+                }
             }
         }
     });
@@ -134,8 +176,11 @@ module.exports = function (file, api) {
                 if (text !== null && !shouldIgnore(text)) {
                     trackString(text);
                     if (args.length <= 1) { // Only replace when there are no extra arguments (avoid setDesc(text, frag) etc.)
-                        args[0] = createTCall(text, path);
-                        stats.replaced++;
+                        const tCall = createTCall(text, path);
+                        if (tCall) {
+                            args[0] = tCall;
+                            stats.replaced++;
+                        }
                     }
                 }
             }
@@ -152,8 +197,11 @@ module.exports = function (file, api) {
             const text = flattenBinaryString(args[1]);
             if (text !== null && !shouldIgnore(text)) {
                 trackString(text);
-                args[1] = createTCall(text, path);
-                stats.replaced++;
+                const tCall = createTCall(text, path);
+                if (tCall) {
+                    args[1] = tCall;
+                    stats.replaced++;
+                }
             }
         }
     });
@@ -171,8 +219,11 @@ module.exports = function (file, api) {
                     const text = flattenBinaryString(prop.value);
                     if (text !== null && !shouldIgnore(text)) {
                         trackString(text);
-                        prop.value = createTCall(text, path);
-                        stats.replaced++;
+                        const tCall = createTCall(text, path);
+                        if (tCall) {
+                            prop.value = tCall;
+                            stats.replaced++;
+                        }
                     }
                 }
             });
@@ -188,8 +239,11 @@ module.exports = function (file, api) {
             const text = flattenBinaryString(args[0]);
             if (text !== null && !shouldIgnore(text)) {
                 trackString(text);
-                args[0] = createTCall(text, path);
-                stats.replaced++;
+                const tCall = createTCall(text, path);
+                if (tCall) {
+                    args[0] = tCall;
+                    stats.replaced++;
+                }
             }
         }
     });
@@ -229,12 +283,15 @@ module.exports = function (file, api) {
             const text = flattenBinaryString(arg);
             if (text !== null && !shouldIgnore(text)) {
                 trackString(text);
-                args[index] = createTCall(text, path);
-                stats.replaced++;
-                if (hasDomElement) {
-                    // Mark as medium risk if part of DOM-mixed pattern
-                } else {
-                    stats.lowRisk = (stats.lowRisk || 0) + 1;
+                const tCall = createTCall(text, path);
+                if (tCall) {
+                    args[index] = tCall;
+                    stats.replaced++;
+                    if (hasDomElement) {
+                        // Mark as medium risk if part of DOM-mixed pattern
+                    } else {
+                        stats.lowRisk = (stats.lowRisk || 0) + 1;
+                    }
                 }
             }
         });
