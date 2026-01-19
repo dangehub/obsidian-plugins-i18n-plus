@@ -203,49 +203,9 @@ Codemod 并非万能。以下情况需要人工（或 AI）介入：
 ### 准备工作
 
 1.  **Fork** 目标插件仓库。
-2.  在 `.github/workflows/` 目录下创建 `i18n-migrate.yml`。
+2.  将 [`templates/auto-migrate-workflow.yml`](../templates/auto-migrate-workflow.yml) 复制到你仓库的 `.github/workflows/i18n-migrate.yml`。
 
-### Workflow 配置
-
-复制以下内容到 `i18n-migrate.yml`：
-
-```yaml
-name: Auto I18n Migration
-on: workflow_dispatch
-jobs:
-  migrate:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
-        with: { node-version: '18' }
-      
-      # 1. 检出工具链
-      - uses: actions/checkout@v3
-        with:
-          repository: your-username/obsidian-plugins-i18n-plus
-          path: _i18n_tools
-
-      # 2. 安装依赖
-      - run: npm install -g jscodeshift typescript
-
-      # 3. 自动注入代码 (Adapter & Init)
-      - run: |
-          jscodeshift -t _i18n_tools/scripts/inject-i18n.cjs src/main.ts --parser=ts --run-in-band
-
-      # 4. 替换字符串
-      - run: |
-          jscodeshift -t _i18n_tools/scripts/i18n-codemod.cjs src/ --parser=ts --run-in-band
-
-      # 5. 生成 Keys
-      - run: node _i18n_tools/scripts/extract-keys.cjs src
-
-      # 6. 提交 PR
-      - uses: peter-evans/create-pull-request@v5
-        with:
-          title: 'refactor: Auto-migrate to i18n-plus'
-          branch: refactor/i18n-plus-migration
-```
+> **注意**：始终参考仓库中的最新工作流文件，本文档可能滞后。
 
 ### 工作原理
 
