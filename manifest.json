@@ -1,6 +1,6 @@
 {
 	"id": "i18n-plus",
-	"name": "I18n Plus",
+	"name": "I18n+",
 	"version": "0.1.0",
 	"minAppVersion": "0.15.0",
 	"description": "Manage translations for Obsidian plugins with hot-reload support and crowdsourced dictionaries.",
