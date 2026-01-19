@@ -3,7 +3,7 @@
 	"name": "i18n+",
 	"version": "0.1.0",
 	"minAppVersion": "0.15.0",
-	"description": "Manage translations for Obsidian plugins with hot-reload support and crowdsourced dictionaries.",
+	"description": "Manage translations for plugins with hot-reload support and crowdsourced dictionaries.",
 	"author": "dangehub",
 	"authorUrl": "https://github.com/dangehub",
 	"isDesktopOnly": false
