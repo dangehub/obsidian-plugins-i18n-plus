@@ -6,7 +6,7 @@ on:
       i18n_plus_repo:
         description: 'Repo of i18n-plus tools (format: owner/repo)'
         required: true
-        default: 'obsidian-plugins-i18n-plus'
+        default: 'dangehub/obsidian-plugins-i18n-plus'
       target_main_file:
         description: 'Path to main.ts'
         required: true
