@@ -15,7 +15,7 @@ export default class I18nPlusPlugin extends Plugin {
 	dictionaryStore: DictionaryStore;
 
 	async onload() {
-		console.info('[i18n-plus] Loading plugin...');
+		if (this.settings?.debugMode) console.debug('[i18n-plus] Loading plugin...');
 
 		await this.loadSettings();
 
@@ -34,8 +34,8 @@ export default class I18nPlusPlugin extends Plugin {
 				}
 				// Load dictionaries for this plugin
 				const count = await this.dictionaryStore.loadDictionariesForPlugin(pluginId);
-				if (this.settings.debugMode || count > 0) {
-					console.info(`[i18n-plus] Loaded ${count} dictionaries for plugin: ${pluginId}`);
+				if (this.settings.debugMode && count > 0) {
+					console.debug(`[i18n-plus] Loaded ${count} dictionaries for plugin: ${pluginId}`);
 				}
 
 				// Apply global locale setting to this plugin if set
@@ -45,7 +45,9 @@ export default class I18nPlusPlugin extends Plugin {
 					if (translator && translator.getLocale() !== this.settings.currentLocale) {
 						try {
 							translator.setLocale(this.settings.currentLocale);
-							console.info(`[i18n-plus] Applied locale preference to ${pluginId}: ${this.settings.currentLocale}`);
+							if (this.settings.debugMode) {
+								console.debug(`[i18n-plus] Applied locale preference to ${pluginId}: ${this.settings.currentLocale}`);
+							}
 						} catch (e) {
 							console.warn(`[i18n-plus] Failed to apply locale to ${pluginId}`, e);
 						}
@@ -59,7 +61,9 @@ export default class I18nPlusPlugin extends Plugin {
 			if (typeof locale === 'string' && locale !== this.settings.currentLocale) {
 				this.settings.currentLocale = locale;
 				await this.saveSettings();
-				console.info(`[i18n-plus] Saved locale preference: ${locale}`);
+				if (this.settings.debugMode) {
+					console.debug(`[i18n-plus] Saved locale preference: ${locale}`);
+				}
 			}
 		});
 
@@ -109,24 +113,25 @@ export default class I18nPlusPlugin extends Plugin {
 		// Delayed auto-load of installed dictionaries (wait for other plugins to register)
 		setTimeout(async () => {
 			const count = await this.dictionaryStore.autoLoadDictionaries();
-			if (count > 0) {
-				console.info(`[i18n-plus] Auto-loaded ${count} dictionaries on startup`);
+			if (count > 0 && this.settings.debugMode) {
+				console.debug(`[i18n-plus] Auto-loaded ${count} dictionaries on startup`);
 			}
 
 			// Restore saved locale setting
 			if (this.settings.currentLocale) {
 				manager.setGlobalLocale(this.settings.currentLocale);
-				console.info(`[i18n-plus] Restored locale: ${this.settings.currentLocale}`);
+				if (this.settings.debugMode) {
+					console.debug(`[i18n-plus] Restored locale: ${this.settings.currentLocale}`);
+				}
 			}
 		}, 3000);
 
-		console.info('[i18n-plus] Plugin loaded successfully');
+		if (this.settings.debugMode) console.debug('[i18n-plus] Plugin loaded successfully');
 	}
 
 	onunload() {
-		// Destroy global API
 		destroyGlobalAPI();
-		console.info('[i18n-plus] Plugin unloaded');
+		if (this.settings.debugMode) console.debug('[i18n-plus] Plugin unloaded');
 	}
 
 	async loadSettings() {

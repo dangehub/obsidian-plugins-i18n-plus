@@ -29,8 +29,6 @@ export class I18nPlusSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 
-		containerEl.createEl('h2', { text: 'I18n Plus Settings' });
-
 		new Setting(containerEl)
 			.setName('Debug mode')
 			.setDesc('Show detailed logs in the console')
@@ -42,7 +40,7 @@ export class I18nPlusSettingTab extends PluginSettingTab {
 				}));
 
 		// Display registered plugins info
-		containerEl.createEl('h3', { text: 'Registered Plugins' });
+		new Setting(containerEl).setName('Registered plugins').setHeading();
 
 		const pluginListEl = containerEl.createDiv({ cls: 'i18n-plus-plugin-list' });
 

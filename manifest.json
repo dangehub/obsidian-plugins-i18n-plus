@@ -3,8 +3,8 @@
 	"name": "I18n Plus",
 	"version": "0.1.0",
 	"minAppVersion": "0.15.0",
-	"description": "A universal i18n framework for Obsidian plugins. Enables dynamic loading/unloading of translation dictionaries.",
-	"author": "zenozero-dev",
-	"authorUrl": "https://github.com/zenozero-dev",
+	"description": "Manage translations for Obsidian plugins with hot-reload support and crowdsourced dictionaries.",
+	"author": "dangehub",
+	"authorUrl": "https://github.com/dangehub",
 	"isDesktopOnly": false
 }
