@@ -86,6 +86,55 @@ node <路径>/extract-keys.cjs src
 
 ---
 
+## ⚙️ 配置选项
+
+适配器在 `adapter.ts` 顶部的配置区域提供了多个可配置选项：
+
+### 内置语言
+
+在 `BUILTIN_LOCALES` 对象中添加你的内置语言：
+
+```typescript
+const BUILTIN_LOCALES: Record<string, Record<string, string>> = {
+    'en': en,
+    'zh': zh,      // 简体中文
+    'ja': ja,      // 日语
+};
+```
+
+> **重要**：请使用 Obsidian 标准语言代码（如简体中文用 `zh` 而非 `zh-CN`）。完整列表见 `src/framework/locales.ts`。
+
+### 基础语言（回退语言）
+
+通过修改 `BASE_LOCALE` 配置最终回退语言：
+
+```typescript
+// 最终回退的基础语言（由插件开发者配置）
+const BASE_LOCALE = 'en';  // 如果你的插件面向中文用户，可以改为 'zh'
+```
+
+此语言在以下情况使用：
+1. 当前语言没有某个 key 的翻译
+2. 上一个成功语言也没有该翻译
+
+### 智能回退系统
+
+适配器使用 5 级回退优先级：
+
+1. **外部词典**（通过 I18n Plus 加载）
+2. **内置语言**（当前语言）
+3. **上一个成功语言**（自动追踪）
+4. **基础语言**（上面配置的）
+5. **原始 Key**
+
+**示例场景**：
+- 插件内置：`en`、`zh`
+- 用户 Obsidian 使用中文 → 自动使用 `zh`
+- 用户通过 I18n Plus 导入日语词典
+- 日语词典缺少部分 key → 回退到 `zh`（而非硬编码的英文！）
+
+---
+
 ## 🧩 手动修复 (The "Human in the Loop")
 
 Codemod 并非万能。以下情况需要人工（或 AI）介入：

@@ -17,6 +17,8 @@ A universal internationalization (i18n) framework for the Obsidian plugin ecosys
 
 ## 🚀 Quick Start
 
+> **For Plugin Developers**: See the full [Migration Guide](docs/I18N_MIGRATION_GUIDE.en.md) for detailed integration instructions.
+
 ### For Plugin Developers
 
 1. **Copy the adapter** to your plugin:
@@ -66,13 +68,15 @@ node scripts/extract-keys.cjs your-plugin/src
 When `t("key")` is called, the adapter searches in this order:
 
 1. **External Dictionary** (loaded via I18n Plus)
-2. **Built-in Language** (shipped with the plugin)
-3. **English Fallback**
-4. **Raw Key**
+2. **Built-in Language** (current locale)
+3. **Last Successful Locale** (smart fallback to previous working language)
+4. **Base Locale** (configurable, defaults to English)
+5. **Raw Key**
 
 This means:
 - Users can override built-in translations with custom JSON files
 - New languages can be added without modifying plugin code
+- If a new language fails, it falls back to the last working language (not hardcoded English)
 - Plugins work offline without I18n Plus installed
 
 ### Architecture
@@ -81,8 +85,8 @@ This means:
 ┌─────────────────────────────────────────────────────────┐
 │                     Your Plugin                          │
 │  ┌─────────────────────────────────────────────────┐    │
-│  │  adapter.ts (self-contained, ~100 lines)        │    │
-│  │  ├── BUILTIN_LOCALES: { en, zh-CN, ... }        │    │
+│  │  adapter.ts (self-contained, ~150 lines)        │    │
+│  │  ├── BUILTIN_LOCALES: { en, zh, ... }           │    │
 │  │  └── _externalDictionaries: { de, fr, ... }     │    │
 │  └─────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────┘

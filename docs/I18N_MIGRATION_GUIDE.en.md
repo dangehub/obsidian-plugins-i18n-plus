@@ -86,6 +86,55 @@ This will generate `src/lang/locales/en.ts`.
 
 ---
 
+## ⚙️ Configuration Options
+
+The adapter provides several configuration options in the configuration section at the top of `adapter.ts`:
+
+### Built-in Locales
+
+Add your built-in languages to the `BUILTIN_LOCALES` object:
+
+```typescript
+const BUILTIN_LOCALES: Record<string, Record<string, string>> = {
+    'en': en,
+    'zh': zh,      // Simplified Chinese
+    'ja': ja,      // Japanese
+};
+```
+
+> **Important**: Use Obsidian standard locale codes (e.g., `zh` for Simplified Chinese, not `zh-CN`). See `src/framework/locales.ts` for the full list.
+
+### Base Locale (Fallback Language)
+
+Configure the final fallback language by modifying `BASE_LOCALE`:
+
+```typescript
+// Base locale for final fallback (configurable by developer)
+const BASE_LOCALE = 'en';  // Change to 'zh' if your plugin targets Chinese users
+```
+
+This is the language used when:
+1. The current locale has no translation for a key
+2. The last successful locale also has no translation
+
+### Smart Fallback System
+
+The adapter uses a 5-level fallback priority:
+
+1. **External Dictionary** (loaded via I18n Plus)
+2. **Built-in Language** (current locale)
+3. **Last Successful Locale** (automatically tracked)
+4. **Base Locale** (configured above)
+5. **Raw Key**
+
+**Example Scenario**:
+- Plugin has built-in: `en`, `zh`
+- User's Obsidian is in Chinese → automatically uses `zh`
+- User imports a Japanese dictionary via I18n Plus
+- Japanese dictionary is missing some keys → falls back to `zh` (not hardcoded English!)
+
+---
+
 ## 🧩 Manual Fixes (The "Human in the Loop")
 
 Codemod is not a silver bullet. Human (or AI) intervention is required in the following cases:
