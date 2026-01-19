@@ -195,4 +195,32 @@ If you ask AI to help you with this, you can use the following Prompt:
 
 ---
 
+## ⚡ Advanced: GitHub Action Automated Migration
+
+We provide an automated solution where you can complete 90% of the migration work by forking the repository and running a GitHub Action.
+
+### Preparation
+
+1.  **Fork** the target plugin repository.
+2.  Copy [`templates/auto-migrate-workflow.yml`](../templates/auto-migrate-workflow.yml) to `.github/workflows/i18n-migrate.yml` in your repository.
+3.  **Configure GitHub Actions Permissions**:
+    - Go to repository **Settings → Actions → General**
+    - Under **Workflow permissions**, select **Read and write permissions**
+    - Check **Allow GitHub Actions to create and approve pull requests**
+    - Click **Save**
+
+> **Note**: Always refer to the latest workflow file in the repository; this documentation may be outdated.
+
+### How It Works
+
+1.  **Inject Script (`inject-i18n.cjs`)**:
+    *   Automatically parses `main.ts` AST.
+    *   Injects `import { initI18n }`.
+    *   Adds `i18n` and `t` properties to the class.
+    *   Inserts initialization code at the beginning of the `onload()` method.
+2.  **Codemod Script**: Transforms all hardcoded strings under `src/`.
+3.  **Create PR**: Submits all changes as a Pull Request for your final manual review.
+
+---
+
 This guide was summarized by Antigravity from the Dataview localization practice.

@@ -204,6 +204,11 @@ Codemod 并非万能。以下情况需要人工（或 AI）介入：
 
 1.  **Fork** 目标插件仓库。
 2.  将 [`templates/auto-migrate-workflow.yml`](../templates/auto-migrate-workflow.yml) 复制到你仓库的 `.github/workflows/i18n-migrate.yml`。
+3.  **配置 GitHub Actions 权限**：
+    - 进入仓库 **Settings → Actions → General**
+    - 在 **Workflow permissions** 下选择 **Read and write permissions**
+    - 勾选 **Allow GitHub Actions to create and approve pull requests**
+    - 点击 **Save**
 
 > **注意**：始终参考仓库中的最新工作流文件，本文档可能滞后。
 
