@@ -1,7 +1,7 @@
 /**
  * I18n Plus Framework
  * 
- * 统一导出
+ * Unified exports
  */
 
 export * from './types';

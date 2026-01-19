@@ -1,23 +1,23 @@
 /**
  * I18n Plus Framework - Obsidian Standard Locales
  * 
- * Obsidian 官方支持的语言列表
- * 来源：https://github.com/obsidianmd/obsidian-translations
+ * Official list of languages supported by Obsidian
+ * Source: https://github.com/obsidianmd/obsidian-translations
  * 
- * 所有引入 i18n plus 的插件都应使用此标准表
+ * All plugins using i18n-plus should follow this standard
  */
 
 export interface LocaleInfo {
-    /** 语言代码 (BCP 47) */
+    /** Language code (BCP 47) */
     code: string;
-    /** 英文名称 */
+    /** English name */
     name: string;
-    /** 本地名称 */
+    /** Native name */
     nativeName: string;
 }
 
 /**
- * Obsidian 官方支持的所有语言
+ * All languages officially supported by Obsidian
  */
 export const OBSIDIAN_LOCALES: LocaleInfo[] = [
     { code: 'en', name: 'English', nativeName: 'English' },
@@ -95,42 +95,42 @@ export const OBSIDIAN_LOCALES: LocaleInfo[] = [
 ];
 
 /**
- * 语言代码到 LocaleInfo 的映射
+ * Map from locale code to LocaleInfo
  */
 export const LOCALE_MAP: Map<string, LocaleInfo> = new Map(
     OBSIDIAN_LOCALES.map(locale => [locale.code, locale])
 );
 
 /**
- * 所有有效的语言代码集合
+ * Set of all valid locale codes
  */
 export const VALID_LOCALE_CODES: Set<string> = new Set(
     OBSIDIAN_LOCALES.map(locale => locale.code)
 );
 
 /**
- * 检查语言代码是否是 Obsidian 支持的语言
+ * Check if a locale code is supported by Obsidian
  */
 export function isValidLocale(code: string): boolean {
     return VALID_LOCALE_CODES.has(code.toLowerCase());
 }
 
 /**
- * 获取语言信息
+ * Get locale information by code
  */
 export function getLocaleInfo(code: string): LocaleInfo | undefined {
     return LOCALE_MAP.get(code.toLowerCase());
 }
 
 /**
- * 规范化语言代码（小写化，将下划线转为连字符）
+ * Normalize locale code (lowercase, convert underscores to hyphens)
  */
 export function normalizeLocaleCode(code: string): string {
     return code.toLowerCase().replace('_', '-');
 }
 
 /**
- * 语言别名映射（用于处理旧版代码或变体）
+ * Locale alias mapping (for legacy codes or variants)
  */
 export const LOCALE_ALIASES: Record<string, string> = {
     'zh-cn': 'zh',
@@ -140,7 +140,7 @@ export const LOCALE_ALIASES: Record<string, string> = {
 };
 
 /**
- * 解析语言代码（处理别名）
+ * Resolve locale code (handles aliases)
  */
 export function resolveLocale(code: string): string {
     const normalized = normalizeLocaleCode(code);

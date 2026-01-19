@@ -1,7 +1,7 @@
 /**
  * I18n Plus Plugin for Obsidian
  * 
- * 为 Obsidian 插件生态提供通用国际化框架
+ * A universal internationalization framework for the Obsidian plugin ecosystem
  */
 
 import { Notice, Plugin } from 'obsidian';
@@ -19,29 +19,29 @@ export default class I18nPlusPlugin extends Plugin {
 
 		await this.loadSettings();
 
-		// 初始化词典存储 (必须在 initGlobalAPI 之前，因为事件监听器需要它)
+		// Initialize dictionary store (must be before initGlobalAPI as event listeners need it)
 		this.dictionaryStore = new DictionaryStore(this.app, this);
 
-		// 先获取 manager 实例并设置事件监听器
-		// 这样当 initGlobalAPI 触发 i18n-plus:ready 事件时，我们能捕获到插件注册
+		// Get manager instance and set up event listeners first
+		// This ensures we capture plugin registrations when initGlobalAPI triggers i18n-plus:ready
 		const manager = getI18nPlusManager();
 
-		// 监听插件注册事件，自动加载该插件的词典并应用语言设置
+		// Listen to plugin registration events, auto-load dictionaries and apply locale settings
 		manager.on('plugin-registered', async (pluginId: unknown) => {
 			if (typeof pluginId === 'string') {
 				if (this.settings.debugMode) {
 					console.log(`[i18n-plus] plugin-registered event for: ${pluginId}`);
 				}
-				// 加载该插件的词典
+				// Load dictionaries for this plugin
 				const count = await this.dictionaryStore.loadDictionariesForPlugin(pluginId);
 				if (this.settings.debugMode || count > 0) {
 					console.info(`[i18n-plus] Loaded ${count} dictionaries for plugin: ${pluginId}`);
 				}
 
-				// 如果有全局语言设置，则应用到该插件
+				// Apply global locale setting to this plugin if set
 				if (this.settings.currentLocale) {
 					const translator = manager.getTranslator(pluginId);
-					// 仅当插件当前语言与全局设置不一致时才切换，避免重复设置
+					// Only switch if plugin's current locale differs from global setting
 					if (translator && translator.getLocale() !== this.settings.currentLocale) {
 						try {
 							translator.setLocale(this.settings.currentLocale);
@@ -54,7 +54,7 @@ export default class I18nPlusPlugin extends Plugin {
 			}
 		});
 
-		// 监听语言变化事件，保存到设置
+		// Listen to locale change events and persist to settings
 		manager.on('locale-changed', async (locale: unknown) => {
 			if (typeof locale === 'string' && locale !== this.settings.currentLocale) {
 				this.settings.currentLocale = locale;
@@ -63,16 +63,16 @@ export default class I18nPlusPlugin extends Plugin {
 			}
 		});
 
-		// 初始化全局 API (这会触发 i18n-plus:ready 事件，导致其他插件注册)
+		// Initialize global API (this triggers i18n-plus:ready event, causing other plugins to register)
 		initGlobalAPI();
 
-		// 添加设置面板
+		// Add settings tab
 		this.addSettingTab(new I18nPlusSettingTab(this.app, this));
 
-		// 添加命令
+		// Add commands
 		this.addCommand({
 			id: 'open-dictionary-manager',
-			name: '打开词典管理器',
+			name: 'Open Dictionary Manager',
 			callback: () => {
 				new DictionaryManagerModal(this.app, this).open();
 			}
@@ -80,40 +80,40 @@ export default class I18nPlusPlugin extends Plugin {
 
 		this.addCommand({
 			id: 'show-registered-plugins',
-			name: '显示已注册插件',
+			name: 'Show Registered Plugins',
 			callback: () => {
 				const manager = getI18nPlusManager();
 				const plugins = manager.getRegisteredPlugins();
 				if (plugins.length === 0) {
-					new Notice('暂无插件注册到 i18n-plus');
+					new Notice('No plugins registered to i18n-plus');
 				} else {
-					new Notice(`已注册: ${plugins.join(', ')}`);
+					new Notice(`Registered: ${plugins.join(', ')}`);
 				}
 			}
 		});
 
 		this.addCommand({
 			id: 'reload-dictionaries',
-			name: '重新加载所有词典',
+			name: 'Reload All Dictionaries',
 			callback: async () => {
 				const count = await this.dictionaryStore.autoLoadDictionaries();
-				new Notice(`已加载 ${count} 个词典`);
+				new Notice(`Loaded ${count} dictionaries`);
 			}
 		});
 
-		// 添加 Ribbon 图标 - 点击打开词典管理器
-		this.addRibbonIcon('languages', 'I18n Plus 词典管理器', () => {
+		// Add ribbon icon - click to open dictionary manager
+		this.addRibbonIcon('languages', 'I18n Plus Dictionary Manager', () => {
 			new DictionaryManagerModal(this.app, this).open();
 		});
 
-		// 延迟自动加载已安装的词典（等待其他插件注册）
+		// Delayed auto-load of installed dictionaries (wait for other plugins to register)
 		setTimeout(async () => {
 			const count = await this.dictionaryStore.autoLoadDictionaries();
 			if (count > 0) {
 				console.info(`[i18n-plus] Auto-loaded ${count} dictionaries on startup`);
 			}
 
-			// 恢复保存的语言设置
+			// Restore saved locale setting
 			if (this.settings.currentLocale) {
 				manager.setGlobalLocale(this.settings.currentLocale);
 				console.info(`[i18n-plus] Restored locale: ${this.settings.currentLocale}`);
@@ -124,7 +124,7 @@ export default class I18nPlusPlugin extends Plugin {
 	}
 
 	onunload() {
-		// 销毁全局 API
+		// Destroy global API
 		destroyGlobalAPI();
 		console.info('[i18n-plus] Plugin unloaded');
 	}

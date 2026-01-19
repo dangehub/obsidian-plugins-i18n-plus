@@ -6,15 +6,15 @@ import { App, PluginSettingTab, Setting } from 'obsidian';
 import type I18nPlusPlugin from './main';
 
 export interface I18nPlusSettings {
-	/** 是否显示调试日志 */
+	/** Whether to show debug logs */
 	debugMode: boolean;
-	/** 当前语言（持久化用户选择） */
+	/** Current locale (persisted user preference) */
 	currentLocale: string;
 }
 
 export const DEFAULT_SETTINGS: I18nPlusSettings = {
 	debugMode: false,
-	currentLocale: '',  // 空表示使用 Obsidian 默认语言
+	currentLocale: '',  // Empty means use Obsidian's default language
 };
 
 export class I18nPlusSettingTab extends PluginSettingTab {
@@ -41,7 +41,7 @@ export class I18nPlusSettingTab extends PluginSettingTab {
 					await this.plugin.saveSettings();
 				}));
 
-		// 显示已注册的插件信息
+		// Display registered plugins info
 		containerEl.createEl('h3', { text: 'Registered Plugins' });
 
 		const pluginListEl = containerEl.createDiv({ cls: 'i18n-plus-plugin-list' });
