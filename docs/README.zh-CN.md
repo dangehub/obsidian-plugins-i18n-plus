@@ -1,4 +1,4 @@
-# I18n Plus
+# i18n+
 
 [![GitHub release](https://img.shields.io/github/v/release/dangehub/obsidian-plugins-i18n-plus)](https://github.com/dangehub/obsidian-plugins-i18n-plus/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -125,6 +125,10 @@ docs/
   ├── README.zh-CN.md     # 中文文档
   └── I18N_MIGRATION_GUIDE.zh-CN.md  # 迁移指南
 ```
+
+## 🚨 Vibe Coding Warning
+
+本项目使用了Vibe Coding，我已尽我所能确保代码的可靠性。但如果你感到介意，请不要使用本项目。
 
 ## 🤝 贡献
 
