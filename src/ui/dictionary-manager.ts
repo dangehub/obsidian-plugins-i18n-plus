@@ -35,7 +35,7 @@ export class DictionaryManagerModal extends Modal {
 
         // Header and Refresh Button
         const headerDiv = contentEl.createDiv({ cls: 'i18n-plus-header' });
-        headerDiv.createEl('h2', { text: '📚 Dictionary manager' });
+        headerDiv.createEl('h2', { text: 'Dictionary manager' });
 
         // Refresh Button
         new Setting(headerDiv)

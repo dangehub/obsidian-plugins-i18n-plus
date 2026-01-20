@@ -97,7 +97,7 @@ export class I18nTranslator<T extends Dictionary = Dictionary> implements I18nTr
         // 3. Parameter Interpolation
         if (params) {
             // Filter out context parameter and undefined values to avoid pollution
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Context is destructured to remove it from the rest object
             const { context: _unused, ...rest } = params as Record<string, string | number | undefined>;
             const interpolationParams: Record<string, string | number> = {};
             for (const [key, value] of Object.entries(rest)) {
