@@ -61,7 +61,7 @@ export class I18nPlusSettingTab extends PluginSettingTab {
 			}
 		} else {
 			pluginListEl.createEl('p', {
-				text: 'i18n-plus API not initialized',
+				text: 'I18n plus API not initialized',
 				cls: 'setting-item-description'
 			});
 		}

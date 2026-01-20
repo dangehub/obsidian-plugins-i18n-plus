@@ -109,7 +109,7 @@ export default class I18nPlusPlugin extends Plugin {
 		});
 
 		// Add ribbon icon - click to open dictionary manager
-		this.addRibbonIcon('languages', 'I18n Plus dictionary manager', () => {
+		this.addRibbonIcon('languages', 'I18n plus dictionary manager', () => {
 			new DictionaryManagerModal(this.app, this).open();
 		});
 

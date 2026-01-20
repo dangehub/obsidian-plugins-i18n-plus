@@ -40,7 +40,7 @@ export class DictionaryManagerModal extends Modal {
         // Refresh Button
         new Setting(headerDiv)
             .addButton(btn => btn
-                .setButtonText('🔄 Refresh')
+                .setButtonText('Refresh')
                 .setTooltip('Reload dictionaries and refresh interface')
                 .onClick(() => {
                     void this.plugin.dictionaryStore.autoLoadDictionaries().then(count => {
@@ -75,7 +75,7 @@ export class DictionaryManagerModal extends Modal {
         } else {
             const pluginList = contentEl.createDiv({ cls: 'i18n-plus-plugin-list' });
             for (const pluginId of registeredPlugins) {
-                await this.renderPluginSection(pluginList, pluginId, installedDicts);
+                this.renderPluginSection(pluginList, pluginId, installedDicts);
             }
         }
 
@@ -250,7 +250,7 @@ export class DictionaryManagerModal extends Modal {
             const result = await this.store.importFromFile(file, pluginId);
 
             if (result.valid) {
-                new Notice(`✅ Import successful`);
+                new Notice('Import successful');
                 void this.onOpen();
             } else {
                 const errorMsg = result.errors?.map(e => e.message).join(', ') || 'Unknown error';
@@ -328,7 +328,7 @@ export class DictionaryManagerModal extends Modal {
         manager.unloadDictionary(dict.pluginId, dict.locale);
         await this.store.deleteDictionary(dict.pluginId, dict.locale);
         new Notice(`Unloaded`);
-        this.onOpen();
+        void this.onOpen();
     }
 
     onClose() {
