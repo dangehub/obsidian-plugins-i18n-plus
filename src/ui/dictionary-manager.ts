@@ -35,17 +35,18 @@ export class DictionaryManagerModal extends Modal {
 
         // Header and Refresh Button
         const headerDiv = contentEl.createDiv({ cls: 'i18n-plus-header' });
-        headerDiv.createEl('h2', { text: '📚 Dictionary Manager' });
+        headerDiv.createEl('h2', { text: '📚 Dictionary manager' });
 
         // Refresh Button
         new Setting(headerDiv)
             .addButton(btn => btn
                 .setButtonText('🔄 Refresh')
                 .setTooltip('Reload dictionaries and refresh interface')
-                .onClick(async () => {
-                    const count = await this.plugin.dictionaryStore.autoLoadDictionaries();
-                    new Notice(`Refreshed. Loaded ${count} dictionaries`);
-                    this.onOpen();
+                .onClick(() => {
+                    void this.plugin.dictionaryStore.autoLoadDictionaries().then(count => {
+                        new Notice(`Refreshed. Loaded ${count} dictionaries`);
+                        void this.onOpen();
+                    });
                 })
             );
 
@@ -60,8 +61,8 @@ export class DictionaryManagerModal extends Modal {
         const registeredPlugins = manager.getRegisteredPlugins();
         const installedDicts = await this.store.listAllDictionaries();
 
-        console.log('[i18n-plus UI] Registered plugins:', registeredPlugins);
-        console.log('[i18n-plus UI] Installed dicts:', installedDicts);
+        console.debug('[i18n-plus UI] Registered plugins:', registeredPlugins);
+        console.debug('[i18n-plus UI] Installed dicts:', installedDicts);
 
         // Registered Plugins Section - Use scrollable container
         contentEl.createEl('h3', { text: `Registered Plugins (${registeredPlugins.length})` });
@@ -93,11 +94,11 @@ export class DictionaryManagerModal extends Modal {
     /**
      * Render single plugin section
      */
-    private async renderPluginSection(
+    private renderPluginSection(
         container: HTMLElement,
         pluginId: string,
         installedDicts: DictionaryFileInfo[]
-    ) {
+    ): void {
         const manager = getI18nPlusManager();
         const translator = manager.getTranslator(pluginId);
         if (!translator) return;
@@ -125,7 +126,7 @@ export class DictionaryManagerModal extends Modal {
                 dropdown.addOption(locale, isExternal ? `📥 ${label}` : label);
             }
             dropdown.setValue(currentLocale);
-            dropdown.onChange(async (value) => {
+            dropdown.onChange((value) => {
                 translator.setLocale(value);
                 manager.setGlobalLocale(value);
                 new Notice(`Switched ${pluginId} locale to: ${value}`);
@@ -135,7 +136,7 @@ export class DictionaryManagerModal extends Modal {
         // Import Button
         pluginSetting.addButton(btn => btn
             .setButtonText('📥')
-            .setTooltip('Import Dictionary')
+            .setTooltip('Import dictionary')
             .onClick(() => this.importDictionaryForPlugin(pluginId))
         );
 
@@ -150,7 +151,7 @@ export class DictionaryManagerModal extends Modal {
                     .setDesc('Source')
                     .addButton(btn => btn
                         .setIcon('download')
-                        .setTooltip('Export (As translation template)')
+                        .setTooltip('Export (as translation template)')
                         .onClick(() => this.exportBuiltinDictionary(pluginId, locale))
                     );
             }
@@ -224,10 +225,11 @@ export class DictionaryManagerModal extends Modal {
                 .addButton(btn => btn
                     .setIcon('trash')
                     .setWarning()
-                    .onClick(async () => {
-                        await this.store.deleteDictionary(dict.pluginId, dict.locale);
-                        new Notice(`Deleted`);
-                        this.onOpen();
+                    .onClick(() => {
+                        void this.store.deleteDictionary(dict.pluginId, dict.locale).then(() => {
+                            new Notice(`Deleted`);
+                            void this.onOpen();
+                        });
                     })
                 );
         }
@@ -248,8 +250,8 @@ export class DictionaryManagerModal extends Modal {
             const result = await this.store.importFromFile(file, pluginId);
 
             if (result.valid) {
-                new Notice(`✅ Import Successful`);
-                this.onOpen();
+                new Notice(`✅ Import successful`);
+                void this.onOpen();
             } else {
                 const errorMsg = result.errors?.map(e => e.message).join(', ') || 'Unknown error';
                 new Notice(`❌ Import Failed: ${errorMsg}`);
@@ -282,9 +284,10 @@ export class DictionaryManagerModal extends Modal {
     /**
      * Export builtin dictionary (from memory)
      */
-    private async exportBuiltinDictionary(pluginId: string, locale: string) {
+    private exportBuiltinDictionary(pluginId: string, locale: string): void {
         // Get translator via global API
-        const translator = (window as any).i18nPlus?.getTranslator(pluginId);
+        const i18nPlusApi = window.i18nPlus;
+        const translator = i18nPlusApi?.getTranslator(pluginId);
         if (!translator) {
             new Notice('Unable to get translator instance');
             return;

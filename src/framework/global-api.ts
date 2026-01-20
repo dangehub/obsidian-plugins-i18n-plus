@@ -31,7 +31,7 @@ export class I18nPlusManager implements I18nPlusAPI {
         }
 
         this.translators.set(pluginId, translator);
-        console.info(`[i18n-plus] Registered plugin: ${pluginId}`);
+        console.debug(`[i18n-plus] Registered plugin: ${pluginId}`);
 
         // Trigger registration event so the main plugin can auto-load dictionaries
         this.emit('plugin-registered', pluginId);
@@ -43,7 +43,7 @@ export class I18nPlusManager implements I18nPlusAPI {
     unregister(pluginId: string): void {
         if (this.translators.has(pluginId)) {
             this.translators.delete(pluginId);
-            console.info(`[i18n-plus] Unregistered plugin: ${pluginId}`);
+            console.debug(`[i18n-plus] Unregistered plugin: ${pluginId}`);
         }
     }
 
@@ -172,7 +172,7 @@ export function initGlobalAPI(): I18nPlusManager {
     // Expose to global
     if (typeof window !== 'undefined') {
         window.i18nPlus = manager;
-        console.info(`[i18n-plus] Global API initialized (v${manager.version})`);
+        console.debug(`[i18n-plus] Global API initialized (v${manager.version})`);
 
         // Broadcast ready event so other plugins can re-register
         window.dispatchEvent(new CustomEvent('i18n-plus:ready', {
@@ -189,7 +189,7 @@ export function initGlobalAPI(): I18nPlusManager {
 export function destroyGlobalAPI(): void {
     if (typeof window !== 'undefined' && window.i18nPlus) {
         delete window.i18nPlus;
-        console.info('[i18n-plus] Global API destroyed');
+        console.debug('[i18n-plus] Global API destroyed');
     }
     instance = null;
 }

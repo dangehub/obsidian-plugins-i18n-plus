@@ -7,7 +7,7 @@
  * - Automatically loading installed dictionaries at startup
  */
 
-import { App, TFolder, TFile, normalizePath } from 'obsidian';
+import { App, normalizePath } from 'obsidian';
 import type { Dictionary, ValidationResult } from '../framework/types';
 import type I18nPlusPlugin from '../main';
 import { getI18nPlusManager } from '../framework/global-api';
@@ -28,9 +28,7 @@ export interface DictionaryStoreConfig {
     basePath: string;
 }
 
-const DEFAULT_CONFIG: DictionaryStoreConfig = {
-    basePath: '.obsidian/plugins/i18n-plus/dictionaries',
-};
+
 
 /**
  * Dictionary Store Service
@@ -101,7 +99,7 @@ export class DictionaryStore {
 
         try {
             await this.app.vault.adapter.write(filePath, content);
-            console.info(`[i18n-plus] Saved dictionary: ${filePath}`);
+            console.debug(`[i18n-plus] Saved dictionary: ${filePath}`);
         } catch (error) {
             console.error(`[i18n-plus] Failed to save dictionary: ${filePath}`, error);
             throw error;
@@ -135,7 +133,7 @@ export class DictionaryStore {
         try {
             if (await this.app.vault.adapter.exists(filePath)) {
                 await this.app.vault.adapter.remove(filePath);
-                console.info(`[i18n-plus] Deleted dictionary: ${filePath}`);
+                console.debug(`[i18n-plus] Deleted dictionary: ${filePath}`);
                 return true;
             }
         } catch (error) {
@@ -175,7 +173,7 @@ export class DictionaryStore {
         }
 
         if (count > 0) {
-            console.info(`[i18n-plus] Loaded ${count} dictionaries for plugin: ${pluginId}`);
+            console.debug(`[i18n-plus] Loaded ${count} dictionaries for plugin: ${pluginId}`);
         }
 
         return count;
@@ -194,7 +192,7 @@ export class DictionaryStore {
 
             const baseList = await this.app.vault.adapter.list(this.basePath);
             if (this.plugin.settings.debugMode) {
-                console.log(`[i18n-plus] Scanning base path: ${this.basePath}`, baseList);
+                console.debug(`[i18n-plus] Scanning base path: ${this.basePath}`, baseList);
             }
 
             // Iterate through plugin directories
@@ -207,7 +205,7 @@ export class DictionaryStore {
 
                 const pluginList = await this.app.vault.adapter.list(pluginFolderPath);
                 if (this.plugin.settings.debugMode) {
-                    console.log(`[i18n-plus] Scanning plugin folder: ${pluginId}`, pluginList);
+                    console.debug(`[i18n-plus] Scanning plugin folder: ${pluginId}`, pluginList);
                 }
 
                 // Iterate through dictionary files
@@ -247,7 +245,7 @@ export class DictionaryStore {
         }
 
         if (this.plugin.settings.debugMode) {
-            console.log('[i18n-plus] Found dictionaries:', result);
+            console.debug('[i18n-plus] Found dictionaries:', result);
         }
 
         return result;
@@ -289,14 +287,14 @@ export class DictionaryStore {
 
                 // Auto-switch to that locale, triggering UI refresh
                 manager.setGlobalLocale(locale);
-                console.info(`[i18n-plus] Auto-switched to locale: ${locale}`);
+                console.debug(`[i18n-plus] Auto-switched to locale: ${locale}`);
             }
 
             return result;
         } catch (error) {
             return {
                 valid: false,
-                errors: [{ key: '$parse', message: `Failed to parse JSON: ${error}` }],
+                errors: [{ key: '$parse', message: `Failed to parse JSON: ${error instanceof Error ? error.message : String(error)}` }],
             };
         }
     }
@@ -331,7 +329,7 @@ export class DictionaryStore {
         }
 
         if (loadedCount > 0) {
-            console.info(`[i18n-plus] Auto-loaded ${loadedCount} dictionaries`);
+            console.debug(`[i18n-plus] Auto-loaded ${loadedCount} dictionaries`);
         }
 
         return loadedCount;

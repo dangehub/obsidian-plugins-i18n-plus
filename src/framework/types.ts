@@ -148,7 +148,7 @@ export interface I18nTranslatorInterface {
      * @param key Translation key
      * @param params Interpolation parameters, or options object containing context
      */
-    t(key: string, params?: Record<string, string | number> | { context?: string;[key: string]: any }): string;
+    t(key: string, params?: Record<string, string | number> | { context?: string;[key: string]: string | number | undefined }): string;
 
     /**
      * Load dictionary

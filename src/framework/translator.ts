@@ -55,7 +55,7 @@ export class I18nTranslator<T extends Dictionary = Dictionary> implements I18nTr
      * @param key Translation key
      * @param params Interpolation parameters, supports {name} format
      */
-    t(key: keyof T | string, params?: Record<string, string | number> | { context?: string;[key: string]: any }): string {
+    t(key: keyof T | string, params?: Record<string, string | number> | { context?: string;[key: string]: string | number | undefined }): string {
         const k = key as string;
         const context = params?.context;
 
@@ -96,8 +96,14 @@ export class I18nTranslator<T extends Dictionary = Dictionary> implements I18nTr
 
         // 3. Parameter Interpolation
         if (params) {
-            // Filter out context parameter to avoid pollution
-            const { context: _ctx, ...interpolationParams } = params as any;
+            // Filter out context parameter and undefined values to avoid pollution
+            const { context: _, ...rest } = params as Record<string, string | number | undefined>;
+            const interpolationParams: Record<string, string | number> = {};
+            for (const [key, value] of Object.entries(rest)) {
+                if (value !== undefined) {
+                    interpolationParams[key] = value;
+                }
+            }
             if (Object.keys(interpolationParams).length > 0) {
                 return this.interpolate(template, interpolationParams);
             }
@@ -139,7 +145,7 @@ export class I18nTranslator<T extends Dictionary = Dictionary> implements I18nTr
         // Store dictionary
         this.dictionaries.set(locale, dict);
 
-        console.info(`[i18n-plus] Loaded dictionary: ${this.pluginId}/${locale}`);
+        console.debug(`[i18n-plus] Loaded dictionary: ${this.pluginId}/${locale}`);
         return result;
     }
 
@@ -155,12 +161,12 @@ export class I18nTranslator<T extends Dictionary = Dictionary> implements I18nTr
 
         if (this.dictionaries.has(locale)) {
             this.dictionaries.delete(locale);
-            console.info(`[i18n-plus] Unloaded dictionary: ${this.pluginId}/${locale}`);
+            console.debug(`[i18n-plus] Unloaded dictionary: ${this.pluginId}/${locale}`);
 
             // If unloading current locale, revert to base locale
             if (this._currentLocale === locale) {
                 this._currentLocale = this.baseLocale;
-                console.info(`[i18n-plus] Locale reset to base: ${this.baseLocale}`);
+                console.debug(`[i18n-plus] Locale reset to base: ${this.baseLocale}`);
             }
         }
     }

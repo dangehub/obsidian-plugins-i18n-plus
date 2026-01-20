@@ -27,43 +27,45 @@ export default class I18nPlusPlugin extends Plugin {
 		const manager = getI18nPlusManager();
 
 		// Listen to plugin registration events, auto-load dictionaries and apply locale settings
-		manager.on('plugin-registered', async (pluginId: unknown) => {
+		manager.on('plugin-registered', (pluginId: unknown) => {
 			if (typeof pluginId === 'string') {
 				if (this.settings.debugMode) {
-					console.log(`[i18n-plus] plugin-registered event for: ${pluginId}`);
+					console.debug(`[i18n-plus] plugin-registered event for: ${pluginId}`);
 				}
 				// Load dictionaries for this plugin
-				const count = await this.dictionaryStore.loadDictionariesForPlugin(pluginId);
-				if (this.settings.debugMode && count > 0) {
-					console.debug(`[i18n-plus] Loaded ${count} dictionaries for plugin: ${pluginId}`);
-				}
+				void this.dictionaryStore.loadDictionariesForPlugin(pluginId).then(count => {
+					if (this.settings.debugMode && count > 0) {
+						console.debug(`[i18n-plus] Loaded ${count} dictionaries for plugin: ${pluginId}`);
+					}
 
-				// Apply global locale setting to this plugin if set
-				if (this.settings.currentLocale) {
-					const translator = manager.getTranslator(pluginId);
-					// Only switch if plugin's current locale differs from global setting
-					if (translator && translator.getLocale() !== this.settings.currentLocale) {
-						try {
-							translator.setLocale(this.settings.currentLocale);
-							if (this.settings.debugMode) {
-								console.debug(`[i18n-plus] Applied locale preference to ${pluginId}: ${this.settings.currentLocale}`);
+					// Apply global locale setting to this plugin if set
+					if (this.settings.currentLocale) {
+						const translator = manager.getTranslator(pluginId);
+						// Only switch if plugin's current locale differs from global setting
+						if (translator && translator.getLocale() !== this.settings.currentLocale) {
+							try {
+								translator.setLocale(this.settings.currentLocale);
+								if (this.settings.debugMode) {
+									console.debug(`[i18n-plus] Applied locale preference to ${pluginId}: ${this.settings.currentLocale}`);
+								}
+							} catch (e) {
+								console.warn(`[i18n-plus] Failed to apply locale to ${pluginId}`, e);
 							}
-						} catch (e) {
-							console.warn(`[i18n-plus] Failed to apply locale to ${pluginId}`, e);
 						}
 					}
-				}
+				});
 			}
 		});
 
 		// Listen to locale change events and persist to settings
-		manager.on('locale-changed', async (locale: unknown) => {
+		manager.on('locale-changed', (locale: unknown) => {
 			if (typeof locale === 'string' && locale !== this.settings.currentLocale) {
 				this.settings.currentLocale = locale;
-				await this.saveSettings();
-				if (this.settings.debugMode) {
-					console.debug(`[i18n-plus] Saved locale preference: ${locale}`);
-				}
+				void this.saveSettings().then(() => {
+					if (this.settings.debugMode) {
+						console.debug(`[i18n-plus] Saved locale preference: ${locale}`);
+					}
+				});
 			}
 		});
 
@@ -76,7 +78,7 @@ export default class I18nPlusPlugin extends Plugin {
 		// Add commands
 		this.addCommand({
 			id: 'open-dictionary-manager',
-			name: 'Open Dictionary Manager',
+			name: 'Open dictionary manager',
 			callback: () => {
 				new DictionaryManagerModal(this.app, this).open();
 			}
@@ -84,7 +86,7 @@ export default class I18nPlusPlugin extends Plugin {
 
 		this.addCommand({
 			id: 'show-registered-plugins',
-			name: 'Show Registered Plugins',
+			name: 'Show registered plugins',
 			callback: () => {
 				const manager = getI18nPlusManager();
 				const plugins = manager.getRegisteredPlugins();
@@ -98,32 +100,34 @@ export default class I18nPlusPlugin extends Plugin {
 
 		this.addCommand({
 			id: 'reload-dictionaries',
-			name: 'Reload All Dictionaries',
-			callback: async () => {
-				const count = await this.dictionaryStore.autoLoadDictionaries();
-				new Notice(`Loaded ${count} dictionaries`);
+			name: 'Reload all dictionaries',
+			callback: () => {
+				void this.dictionaryStore.autoLoadDictionaries().then(count => {
+					new Notice(`Loaded ${count} dictionaries`);
+				});
 			}
 		});
 
 		// Add ribbon icon - click to open dictionary manager
-		this.addRibbonIcon('languages', 'I18n Plus Dictionary Manager', () => {
+		this.addRibbonIcon('languages', 'I18n Plus dictionary manager', () => {
 			new DictionaryManagerModal(this.app, this).open();
 		});
 
 		// Delayed auto-load of installed dictionaries (wait for other plugins to register)
-		setTimeout(async () => {
-			const count = await this.dictionaryStore.autoLoadDictionaries();
-			if (count > 0 && this.settings.debugMode) {
-				console.debug(`[i18n-plus] Auto-loaded ${count} dictionaries on startup`);
-			}
-
-			// Restore saved locale setting
-			if (this.settings.currentLocale) {
-				manager.setGlobalLocale(this.settings.currentLocale);
-				if (this.settings.debugMode) {
-					console.debug(`[i18n-plus] Restored locale: ${this.settings.currentLocale}`);
+		setTimeout(() => {
+			void this.dictionaryStore.autoLoadDictionaries().then(count => {
+				if (count > 0 && this.settings.debugMode) {
+					console.debug(`[i18n-plus] Auto-loaded ${count} dictionaries on startup`);
 				}
-			}
+
+				// Restore saved locale setting
+				if (this.settings.currentLocale) {
+					manager.setGlobalLocale(this.settings.currentLocale);
+					if (this.settings.debugMode) {
+						console.debug(`[i18n-plus] Restored locale: ${this.settings.currentLocale}`);
+					}
+				}
+			});
 		}, 3000);
 
 		if (this.settings.debugMode) console.debug('[i18n-plus] Plugin loaded successfully');
