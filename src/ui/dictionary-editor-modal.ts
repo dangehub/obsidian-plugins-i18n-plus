@@ -21,9 +21,12 @@ import type { Dictionary } from '../framework/types';
 /** Single dictionary entry with variable detection */
 interface DictionaryEntry {
     key: string;
-    value: string;
+    value: string;              // Current value (may be edited)
+    originalValue: string;      // Original value for comparison
     hasVariables: boolean;
-    variables: string[];
+    variables: string[];        // Expected variables from original
+    isEdited: boolean;          // Has been modified
+    validationError?: string;   // Validation error message
 }
 
 /** Editor state */
@@ -35,6 +38,8 @@ interface EditorState {
     filteredEntries: DictionaryEntry[];
     searchQuery: string;
     isReadOnly: boolean;
+    hasUnsavedChanges: boolean;  // Track if any entry is edited
+    originalDict?: Dictionary;   // Keep original to preserve $meta and other fields
 }
 
 // ============================================================================
@@ -77,6 +82,7 @@ export class DictionaryEditorModal extends Modal {
     private store: DictionaryStore;
     private state: EditorState;
     private contentContainer: HTMLElement | null = null;
+    private saveButton: HTMLButtonElement | null = null;  // Reference for dynamic updates
 
     constructor(
         app: App,
@@ -95,7 +101,8 @@ export class DictionaryEditorModal extends Modal {
             entries: [],
             filteredEntries: [],
             searchQuery: '',
-            isReadOnly: true, // Phase 1: always read-only
+            isReadOnly: !isBuiltin ? false : true, // Builtin = read-only, External = editable
+            hasUnsavedChanges: false,
         };
     }
 
@@ -118,6 +125,32 @@ export class DictionaryEditorModal extends Modal {
     onClose() {
         const { contentEl } = this;
         contentEl.empty();
+    }
+
+    /**
+     * Confirm close with unsaved changes
+     */
+    private async confirmClose(): Promise<void> {
+        if (!this.state.hasUnsavedChanges) {
+            this.close();
+            return;
+        }
+
+        // Simple confirmation using browser confirm
+        const saveFirst = confirm(
+            'You have unsaved changes.\n\n' +
+            'Click OK to save and close, or Cancel to discard changes.'
+        );
+
+        if (saveFirst) {
+            const saved = await this.saveDictionary();
+            if (saved) {
+                this.close();
+            }
+        } else {
+            // Discard changes and close
+            this.close();
+        }
     }
 
     // ========================================================================
@@ -148,6 +181,9 @@ export class DictionaryEditorModal extends Modal {
             return;
         }
 
+        // Store original dict for preserving metadata
+        this.state.originalDict = dict;
+
         // Parse entries with variable detection
         this.state.entries = this.parseEntries(dict);
         this.state.filteredEntries = [...this.state.entries];
@@ -159,7 +195,14 @@ export class DictionaryEditorModal extends Modal {
         for (const [key, value] of Object.entries(dict)) {
             if (typeof value === 'string') {
                 const { hasVariables, variables } = detectVariables(value);
-                entries.push({ key, value, hasVariables, variables });
+                entries.push({
+                    key,
+                    value,
+                    originalValue: value,
+                    hasVariables,
+                    variables,
+                    isEdited: false,
+                });
             }
         }
 
@@ -270,7 +313,9 @@ export class DictionaryEditorModal extends Modal {
     }
 
     private renderEntryRow(tbody: HTMLElement, entry: DictionaryEntry): void {
-        const row = tbody.createEl('tr', { cls: 'i18n-plus-editor-row' });
+        const row = tbody.createEl('tr', {
+            cls: `i18n-plus-editor-row ${entry.isEdited ? 'is-edited' : ''} ${entry.validationError ? 'has-error' : ''}`
+        });
 
         // Key cell
         const keyCell = row.createEl('td', { cls: 'i18n-plus-editor-cell-key' });
@@ -284,14 +329,40 @@ export class DictionaryEditorModal extends Modal {
             warning.setAttribute('title', `Contains variables: ${entry.variables.join(', ')}\nDo not translate these placeholders.`);
         }
 
+        // Validation error icon
+        if (entry.validationError) {
+            const errorIcon = keyCell.createSpan({ cls: 'i18n-plus-editor-error-icon' });
+            setIcon(errorIcon, 'x-circle');
+            errorIcon.setAttribute('title', entry.validationError);
+        }
+
         // Value cell
         const valueCell = row.createEl('td', { cls: 'i18n-plus-editor-cell-value' });
 
-        if (entry.hasVariables) {
-            // Highlight variables in value
-            this.renderValueWithHighlight(valueCell, entry.value, entry.variables);
+        if (this.state.isReadOnly) {
+            // Read-only mode: display text with variable highlighting
+            if (entry.hasVariables) {
+                this.renderValueWithHighlight(valueCell, entry.value, entry.variables);
+            } else {
+                valueCell.textContent = entry.value;
+            }
         } else {
-            valueCell.textContent = entry.value;
+            // Editable mode: textarea
+            const textarea = valueCell.createEl('textarea', {
+                cls: 'i18n-plus-editor-textarea',
+                text: entry.value
+            });
+            textarea.rows = Math.min(3, Math.max(1, entry.value.split('\n').length));
+
+            textarea.addEventListener('input', () => {
+                this.handleEntryEdit(entry, textarea.value);
+                row.className = `i18n-plus-editor-row ${entry.isEdited ? 'is-edited' : ''} ${entry.validationError ? 'has-error' : ''}`;
+            });
+
+            textarea.addEventListener('blur', () => {
+                // Adjust row height after editing
+                textarea.rows = Math.min(3, Math.max(1, textarea.value.split('\n').length));
+            });
         }
     }
 
@@ -313,21 +384,51 @@ export class DictionaryEditorModal extends Modal {
     private renderFooter(container: HTMLElement): void {
         const footer = container.createDiv({ cls: 'i18n-plus-editor-footer' });
 
+        const setting = new Setting(footer);
+
+        // Save button (only in editable mode)
+        if (!this.state.isReadOnly) {
+            setting.addButton(btn => {
+                btn.setButtonText('Save')
+                    .setIcon('save')
+                    .setCta();
+
+                // Manual event listener to ensure it fires reliably
+                btn.buttonEl.addEventListener('click', async () => {
+                    if (!btn.buttonEl.disabled) {
+                        await this.saveDictionary();
+                        // Update button state after save
+                        this.updateSaveButtonState();
+                    }
+                });
+
+                // Disable if no changes (initial state)
+                btn.setDisabled(!this.state.hasUnsavedChanges);
+                // Store reference for dynamic updates
+                this.saveButton = btn.buttonEl;
+            });
+        }
+
         // Export button
-        new Setting(footer)
-            .addButton(btn => btn
-                .setButtonText('Export JSON')
-                .setIcon('download')
-                .onClick(async () => {
-                    await this.exportDictionary();
-                })
-            )
-            .addButton(btn => btn
-                .setButtonText('Close')
-                .onClick(() => {
+        setting.addButton(btn => btn
+            .setButtonText('Export JSON')
+            .setIcon('download')
+            .onClick(async () => {
+                await this.exportDictionary();
+            })
+        );
+
+        // Close button
+        setting.addButton(btn => btn
+            .setButtonText('Close')
+            .onClick(async () => {
+                if (!this.state.isReadOnly && this.state.hasUnsavedChanges) {
+                    await this.confirmClose();
+                } else {
                     this.close();
-                })
-            );
+                }
+            })
+        );
     }
 
     // ========================================================================
@@ -376,12 +477,126 @@ export class DictionaryEditorModal extends Modal {
     }
 
     // ========================================================================
-    // Phase 2 Extension Points (not implemented in Phase 1)
+    // Edit Handling (Phase 2)
     // ========================================================================
 
-    /** Override in Phase 2 to handle entry edits */
-    protected onEntryEdit?(key: string, newValue: string): void;
+    /**
+     * Handle entry edit: update value, validate variables, track changes
+     */
+    private handleEntryEdit(entry: DictionaryEntry, newValue: string): void {
+        entry.value = newValue;
 
-    /** Override in Phase 2 to handle save */
-    protected onSave?(): Promise<void>;
+        // Check if edited (different from original)
+        entry.isEdited = newValue !== entry.originalValue;
+
+        // Validate variables if original had any
+        if (entry.hasVariables) {
+            entry.validationError = this.validateVariables(entry.variables, newValue);
+        } else {
+            entry.validationError = undefined;
+        }
+
+        // Update global unsaved changes state
+        this.state.hasUnsavedChanges = this.state.entries.some(e => e.isEdited);
+
+        // Update save button state
+        this.updateSaveButtonState();
+
+        // Update stats
+        const toolbar = this.contentEl.querySelector('.i18n-plus-editor-toolbar');
+        if (toolbar) {
+            const stats = toolbar.querySelector('.i18n-plus-editor-stats');
+            if (stats) this.updateStats(stats as HTMLElement);
+        }
+
+        // Trigger optional callback
+        if (this.onEntryEdit) {
+            this.onEntryEdit(entry.key, newValue);
+        }
+    }
+
+    /**
+     * Update save button disabled state based on hasUnsavedChanges
+     */
+    private updateSaveButtonState(): void {
+        if (this.saveButton) {
+            this.saveButton.disabled = !this.state.hasUnsavedChanges;
+        }
+    }
+
+    /**
+     * Validate that all expected variables are preserved in the edited value
+     */
+    private validateVariables(expectedVars: string[], newValue: string): string | undefined {
+        const { variables: actualVars } = detectVariables(newValue);
+
+        // Check for missing variables
+        const missing = expectedVars.filter(v => !actualVars.includes(v));
+        if (missing.length > 0) {
+            return `Missing variables: ${missing.join(', ')}`;
+        }
+
+        // Check for extra variables (added ones that weren't in original)
+        const extra = actualVars.filter(v => !expectedVars.includes(v));
+        if (extra.length > 0) {
+            return `Unexpected variables: ${extra.join(', ')}`;
+        }
+
+        return undefined;
+    }
+
+    /**
+     * Save edited entries back to dictionary file
+     */
+    private async saveDictionary(): Promise<boolean> {
+        if (!this.state.hasUnsavedChanges) {
+            return true;
+        }
+
+        // Check for validation errors
+        const errors = this.state.entries.filter(e => e.validationError);
+        if (errors.length > 0) {
+            new Notice(`Cannot save: ${errors.length} entries have validation errors`);
+            return false;
+        }
+
+        // Build dictionary from entries
+        const dict: Dictionary = {};
+
+        // Preserve metadata
+        if (this.state.originalDict && this.state.originalDict.$meta) {
+            dict.$meta = { ...this.state.originalDict.$meta };
+        }
+
+        for (const entry of this.state.entries) {
+            dict[entry.key] = entry.value;
+        }
+
+        try {
+            await this.store.saveDictionary(this.state.pluginId, this.state.locale, dict);
+
+            // Hot reload: update memory in Global Manager so changes are applied immediately
+            // without needing a full plugin reload
+            const manager = getI18nPlusManager();
+            manager.loadDictionary(this.state.pluginId, this.state.locale, dict);
+
+            // Reset edited state
+            for (const entry of this.state.entries) {
+                entry.originalValue = entry.value;
+                entry.isEdited = false;
+            }
+            this.state.hasUnsavedChanges = false;
+
+            new Notice(`Saved and refreshed ${this.state.locale} dictionary`);
+            this.renderContent();
+            return true;
+        } catch (error) {
+            console.error('[i18n-plus] Failed to save dictionary:', error);
+            new Notice('Failed to save dictionary');
+            return false;
+        }
+    }
+
+    /** Override callback for entry edits */
+    protected onEntryEdit?(key: string, newValue: string): void;
 }

@@ -399,3 +399,59 @@
 .i18n-plus-editor-footer .setting-item-control {
     gap: 10px;
 }
+
+/* ============================================================================
+   Editor Mode Styles (Phase 2)
+   ============================================================================ */
+
+/* Editable textarea in cells */
+.i18n-plus-editor-textarea {
+    width: 100%;
+    min-height: 32px;
+    padding: 6px 8px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    background: var(--background-primary);
+    color: var(--text-normal);
+    font-size: 14px;
+    line-height: 1.5;
+    resize: vertical;
+    font-family: inherit;
+}
+
+.i18n-plus-editor-textarea:focus {
+    outline: none;
+    border-color: var(--interactive-accent);
+    box-shadow: 0 0 0 2px var(--interactive-accent-hover);
+}
+
+/* Row states */
+.i18n-plus-editor-row.is-edited {
+    background: var(--background-modifier-success);
+}
+
+.i18n-plus-editor-row.has-error {
+    background: var(--background-modifier-error);
+}
+
+.i18n-plus-editor-row.is-edited .i18n-plus-editor-textarea {
+    border-color: var(--color-green);
+}
+
+.i18n-plus-editor-row.has-error .i18n-plus-editor-textarea {
+    border-color: var(--color-red);
+}
+
+/* Error icon */
+.i18n-plus-editor-error-icon {
+    color: var(--color-red);
+    flex-shrink: 0;
+    cursor: help;
+    margin-left: 4px;
+}
+
+/* Disabled save button */
+.i18n-plus-editor-footer button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
