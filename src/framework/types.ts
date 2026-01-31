@@ -190,6 +190,12 @@ export interface I18nTranslatorInterface {
     getExternalLocales(): string[];
 
     /**
+     * Get builtin dictionary data for specific locale (optional, for editors)
+     * @param locale Locale identifier
+     */
+    getBuiltinDictionary?(locale: string): Dictionary | undefined;
+
+    /**
      * Get dictionary data for specific locale
      * @param locale Locale identifier
      */

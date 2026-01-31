@@ -194,3 +194,208 @@
 .i18n-plus-orphan-list .setting-item {
     padding: 5px 0;
 }
+
+/* ============================================================================
+   Dictionary Editor Modal Styles
+   ============================================================================ */
+
+.modal:has(.i18n-plus-editor) {
+    width: 90vw;
+    max-width: 900px;
+}
+
+.i18n-plus-editor {
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    height: 70vh;
+    max-height: 600px;
+}
+
+/* Editor Header */
+.i18n-plus-editor-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    background: var(--background-secondary);
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.i18n-plus-editor-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.i18n-plus-editor-icon {
+    color: var(--interactive-accent);
+}
+
+.i18n-plus-editor-title-text {
+    font-size: 1.2em;
+    font-weight: 600;
+}
+
+.i18n-plus-editor-badges {
+    display: flex;
+    gap: 8px;
+}
+
+.i18n-plus-badge-custom {
+    background-color: var(--color-green);
+    color: white;
+}
+
+.i18n-plus-badge-readonly {
+    background-color: var(--background-modifier-border);
+    color: var(--text-muted);
+}
+
+/* Editor Toolbar */
+.i18n-plus-editor-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 20px;
+    background: var(--background-primary-alt);
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.i18n-plus-editor-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    padding: 6px 12px;
+    flex: 1;
+    max-width: 300px;
+}
+
+.i18n-plus-editor-search-icon {
+    color: var(--text-muted);
+}
+
+.i18n-plus-editor-search-input {
+    border: none;
+    background: transparent;
+    flex: 1;
+    font-size: 14px;
+    outline: none;
+}
+
+.i18n-plus-editor-stats {
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+/* Editor Content */
+.i18n-plus-editor-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0;
+}
+
+.i18n-plus-editor-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 200px;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+/* Editor Table */
+.i18n-plus-editor-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.i18n-plus-editor-table th {
+    position: sticky;
+    top: 0;
+    background: var(--background-secondary);
+    padding: 12px 16px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    border-bottom: 2px solid var(--background-modifier-border);
+}
+
+.i18n-plus-editor-th-key {
+    width: 40%;
+}
+
+.i18n-plus-editor-th-value {
+    width: 60%;
+}
+
+.i18n-plus-editor-row {
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.i18n-plus-editor-row:hover {
+    background: var(--background-modifier-hover);
+}
+
+.i18n-plus-editor-cell-key,
+.i18n-plus-editor-cell-value {
+    padding: 10px 16px;
+    vertical-align: top;
+}
+
+.i18n-plus-editor-cell-key {
+    font-family: var(--font-monospace);
+    font-size: 13px;
+    color: var(--text-accent);
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+}
+
+.i18n-plus-editor-key {
+    word-break: break-all;
+}
+
+.i18n-plus-editor-var-warning {
+    color: var(--color-yellow);
+    flex-shrink: 0;
+    cursor: help;
+}
+
+.i18n-plus-editor-cell-value {
+    font-size: 14px;
+    line-height: 1.5;
+    word-break: break-word;
+}
+
+.i18n-plus-editor-var-highlight {
+    background: var(--color-yellow);
+    color: var(--text-on-accent);
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-family: var(--font-monospace);
+    font-size: 0.9em;
+}
+
+/* Editor Footer */
+.i18n-plus-editor-footer {
+    padding: 12px 20px;
+    background: var(--background-secondary);
+    border-top: 1px solid var(--background-modifier-border);
+    display: flex;
+    justify-content: flex-end;
+}
+
+.i18n-plus-editor-footer .setting-item {
+    border: none;
+    padding: 0;
+}
+
+.i18n-plus-editor-footer .setting-item-control {
+    gap: 10px;
+}

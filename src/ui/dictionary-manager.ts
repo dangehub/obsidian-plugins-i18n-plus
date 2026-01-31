@@ -14,6 +14,7 @@ import type I18nPlusPlugin from '../main';
 import { getI18nPlusManager } from '../framework/global-api';
 import { DictionaryStore, DictionaryFileInfo } from '../services/dictionary-store';
 import { OBSIDIAN_LOCALES } from '../framework/locales';
+import { DictionaryEditorModal } from './dictionary-editor-modal';
 
 /**
  * Dictionary Manager Modal
@@ -199,6 +200,8 @@ export class DictionaryManagerModal extends Modal {
         this.renderBadge(name, 'Plugin', 'builtin');
 
         const controls = inner.createDiv({ cls: 'setting-item-control' });
+
+        // Export template only (builtin dictionaries are part of plugin code, cannot be viewed generically)
         const exportBtn = controls.createEl('button', { cls: 'clickable-icon' });
         exportBtn.setAttribute('aria-label', 'Export template');
         setIcon(exportBtn, 'download');
@@ -220,6 +223,15 @@ export class DictionaryManagerModal extends Modal {
         }
 
         const controls = inner.createDiv({ cls: 'setting-item-control' });
+
+        // View Content
+        const viewBtn = controls.createEl('button', { cls: 'clickable-icon' });
+        viewBtn.setAttribute('aria-label', 'View content');
+        setIcon(viewBtn, 'eye');
+        viewBtn.onclick = (e) => {
+            e.stopPropagation();
+            new DictionaryEditorModal(this.app, this.plugin, dict.pluginId, dict.locale, false).open();
+        };
 
         // Export
         const exportBtn = controls.createEl('button', { cls: 'clickable-icon' });
