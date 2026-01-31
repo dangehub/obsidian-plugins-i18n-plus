@@ -1,14 +1,14 @@
 /**
- * I18n Plus - Dictionary Editor Modal
+ * I18n Plus - Dictionary Editor View
  * 
- * Read-only dictionary viewer with:
+ * Read-only or Editable dictionary viewer with:
  * - Full dictionary content display
  * - Variable detection and highlighting
  * - Search/filter functionality
- * - Extensible architecture for future editing
+ * - Compatible with Floating Widget architecture
  */
 
-import { App, Modal, Setting, setIcon, Notice } from 'obsidian';
+import { App, Modal, Setting, setIcon, Notice, setTooltip } from 'obsidian';
 import type I18nPlusPlugin from '../main';
 import { DictionaryStore } from '../services/dictionary-store';
 import { getI18nPlusManager } from '../framework/global-api';
@@ -16,11 +16,11 @@ import type { Dictionary, DictionaryMeta } from '../framework/types';
 import { t } from '../lang';
 
 // ============================================================================
-// Data Models
+// Data Models DictionaryEntry & EditorState
 // ============================================================================
 
 /** Single dictionary entry with variable detection */
-interface DictionaryEntry {
+export interface DictionaryEntry {
     key: string;
     value: string;              // Current value (may be edited)
     originalValue: string;      // Original value for comparison
@@ -79,15 +79,17 @@ function detectVariables(value: string): { hasVariables: boolean; variables: str
 }
 
 // ============================================================================
-// Dictionary Editor Modal
+// Dictionary Editor View
 // ============================================================================
 
-export class DictionaryEditorModal extends Modal {
+export class DictionaryEditorView {
+    private app: App;
     private plugin: I18nPlusPlugin;
     private store: DictionaryStore;
     private state: EditorState;
     private contentContainer: HTMLElement | null = null;
     private saveButton: HTMLButtonElement | null = null;  // Reference for dynamic updates
+    private container: HTMLElement | null = null; // Reference to main container
 
     constructor(
         app: App,
@@ -96,7 +98,7 @@ export class DictionaryEditorModal extends Modal {
         locale: string,
         isBuiltin: boolean
     ) {
-        super(app);
+        this.app = app;
         this.plugin = plugin;
         this.store = new DictionaryStore(app, plugin);
         this.state = {
@@ -112,25 +114,25 @@ export class DictionaryEditorModal extends Modal {
         };
     }
 
-    async onOpen() {
-        const { contentEl } = this;
-        contentEl.empty();
-        contentEl.addClass('i18n-plus-editor');
+    async render(container: HTMLElement) {
+        this.container = container;
+        container.empty();
+        container.addClass('i18n-plus-editor');
 
         // Load dictionary
         await this.loadDictionary();
 
         // Render UI
-        this.renderHeader(contentEl);
-        this.renderToolbar(contentEl);
-        this.contentContainer = contentEl.createDiv({ cls: 'i18n-plus-editor-content' });
+        this.renderHeader(container);
+        this.renderToolbar(container);
+        this.contentContainer = container.createDiv({ cls: 'i18n-plus-editor-content' });
         this.renderContent();
-        this.renderFooter(contentEl);
+        this.renderFooter(container);
     }
 
-    onClose() {
-        const { contentEl } = this;
-        contentEl.empty();
+    // Logic to switch back to manager view
+    private close() {
+        this.plugin.showDictionaryManager();
     }
 
     /**
@@ -160,7 +162,7 @@ export class DictionaryEditorModal extends Modal {
     }
 
     // ========================================================================
-    // Data Loading
+    // Data Loading (Identical logic)
     // ========================================================================
 
     private async loadDictionary(): Promise<void> {
@@ -247,13 +249,25 @@ export class DictionaryEditorModal extends Modal {
     private renderHeader(container: HTMLElement): void {
         const header = container.createDiv({ cls: 'i18n-plus-editor-header' });
 
+        // Back Button
+        const backBtn = header.createDiv({ cls: 'clickable-icon i18n-plus-editor-back-btn' });
+        setIcon(backBtn, 'arrow-left');
+        setTooltip(backBtn, 'Back');
+        backBtn.onclick = async () => {
+            if (!this.state.isReadOnly && this.state.hasUnsavedChanges) {
+                await this.confirmClose();
+            } else {
+                this.close();
+            }
+        };
+
         // Title with plugin name and locale
         const titleContainer = header.createDiv({ cls: 'i18n-plus-editor-title' });
-        const icon = titleContainer.createSpan({ cls: 'i18n-plus-editor-icon' });
-        setIcon(icon, 'book-open');
+        // const icon = titleContainer.createSpan({ cls: 'i18n-plus-editor-icon' });
+        // setIcon(icon, 'book-open');
 
         titleContainer.createSpan({
-            text: `${this.state.pluginId} - ${this.state.locale}`,
+            text: `${this.state.pluginId} / ${this.state.locale}`,
             cls: 'i18n-plus-editor-title-text'
         });
 
@@ -286,6 +300,7 @@ export class DictionaryEditorModal extends Modal {
             placeholder: t('editor.search_placeholder'),
             cls: 'i18n-plus-editor-search-input'
         });
+        searchInput.value = this.state.searchQuery;
 
         searchInput.addEventListener('input', () => {
             this.state.searchQuery = searchInput.value.toLowerCase();
@@ -348,7 +363,8 @@ export class DictionaryEditorModal extends Modal {
         }
 
         // Create table with new layout
-        const table = this.contentContainer.createEl('table', { cls: 'i18n-plus-editor-table' });
+        const tableContainer = this.contentContainer.createDiv({ cls: 'i18n-plus-editor-table-container' });
+        const table = tableContainer.createEl('table', { cls: 'i18n-plus-editor-table' });
 
         // Header row - only show SOURCE and TRANSLATION for editable mode
         if (!this.state.isReadOnly) {
@@ -424,7 +440,7 @@ export class DictionaryEditorModal extends Modal {
                 cls: 'i18n-plus-editor-textarea',
                 text: entry.value
             });
-            textarea.rows = Math.min(3, Math.max(1, (entry.value || entry.baseValue || '').split('\n').length));
+            textarea.rows = Math.min(6, Math.max(1, (entry.value || entry.baseValue || '').split('\n').length));
 
             // Placeholder shows base value if current value is empty
             if (!entry.value && entry.baseValue) {
@@ -436,9 +452,11 @@ export class DictionaryEditorModal extends Modal {
                 contentRow.className = `i18n-plus-editor-content-row ${entry.isEdited ? 'is-edited' : ''} ${entry.validationError ? 'has-error' : ''}`;
             });
 
-            textarea.addEventListener('blur', () => {
-                textarea.rows = Math.min(3, Math.max(1, textarea.value.split('\n').length));
+            // Auto resize
+            textarea.addEventListener('input', () => {
+                textarea.rows = Math.min(6, Math.max(1, textarea.value.split('\n').length));
             });
+
         } else {
             // Read-only mode: original two-column layout (KEY | VALUE)
             const row = tbody.createEl('tr', { cls: 'i18n-plus-editor-row' });
@@ -557,7 +575,7 @@ export class DictionaryEditorModal extends Modal {
             );
         }
 
-        // Close button
+        // Close button (Changed to Back or Close Panel)
         setting.addButton(btn => btn
             .setButtonText(t('editor.close'))
             .onClick(async () => {
@@ -623,7 +641,7 @@ export class DictionaryEditorModal extends Modal {
     }
 
     // ========================================================================
-    // Edit Handling (Phase 2)
+    // Edit Handling
     // ========================================================================
 
     /**
@@ -649,9 +667,11 @@ export class DictionaryEditorModal extends Modal {
         this.updateSaveButtonState();
 
         // Update stats
-        const toolbar = this.contentEl.querySelector('.i18n-plus-editor-toolbar');
-        if (toolbar) {
-            const stats = toolbar.querySelector('.i18n-plus-editor-stats');
+        // We can't query selector easily scoped to this view unless we stored the stats container
+        // But since re-rendering entire row is partial, we can't easily update toolbar stats without ref
+        // Let's just re-render stats if we can find it
+        if (this.container) {
+            const stats = this.container.querySelector('.i18n-plus-editor-stats');
             if (stats) this.updateStats(stats as HTMLElement);
         }
 
@@ -721,8 +741,7 @@ export class DictionaryEditorModal extends Modal {
         try {
             await this.store.saveDictionary(this.state.pluginId, this.state.locale, dict);
 
-            // Hot reload: update memory in Global Manager so changes are applied immediately
-            // without needing a full plugin reload
+            // Hot reload: update memory in Global Manager
             const manager = getI18nPlusManager();
             manager.loadDictionary(this.state.pluginId, this.state.locale, dict);
 
@@ -749,6 +768,7 @@ export class DictionaryEditorModal extends Modal {
 
 /**
  * Modal to edit dictionary metadata
+ * Included here as helper
  */
 class MetadataEditorModal extends Modal {
     private meta: Partial<DictionaryMeta>;
@@ -807,12 +827,10 @@ class MetadataEditorModal extends Modal {
                 .setValue(this.meta.description || '')
                 .onChange(val => this.meta.description = val));
 
-        const div = contentEl.createDiv({
-            cls: 'modal-button-container',
-            attr: { style: 'margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px;' }
-        });
+        // Footer buttons
+        const footer = contentEl.createDiv({ cls: 'modal-button-container' });
 
-        new Setting(div)
+        new Setting(footer)
             .addButton(btn => btn
                 .setButtonText(t('action.cancel'))
                 .onClick(() => this.close()))

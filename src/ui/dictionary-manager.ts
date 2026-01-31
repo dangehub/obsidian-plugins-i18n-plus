@@ -1,5 +1,5 @@
 /**
- * I18n Plus - Dictionary Management Modal
+ * I18n Plus - Dictionary Management View
  * 
  * Dictionary management interface, providing:
  * - Viewing registered plugin list
@@ -14,76 +14,113 @@ import type I18nPlusPlugin from '../main';
 import { getI18nPlusManager } from '../framework/global-api';
 import { DictionaryStore, DictionaryFileInfo } from '../services/dictionary-store';
 import { OBSIDIAN_LOCALES } from '../framework/locales';
-import { DictionaryEditorModal } from './dictionary-editor-modal';
 import { t } from '../lang';
 
 /**
- * Dictionary Manager Modal
+ * Dictionary Manager View
+ * Renders into a container (Floating Widget) instead of being a Modal itself.
  */
-export class DictionaryManagerModal extends Modal {
+export class DictionaryManagerView {
+    private app: App;
     private plugin: I18nPlusPlugin;
     private store: DictionaryStore;
 
     constructor(app: App, plugin: I18nPlusPlugin) {
-        super(app);
+        this.app = app;
         this.plugin = plugin;
         this.store = new DictionaryStore(app, plugin);
     }
 
-    async onOpen() {
-        const { contentEl } = this;
-        contentEl.empty();
-        contentEl.addClass('i18n-plus-manager');
+    async render(container: HTMLElement) {
+        container.empty();
+        container.addClass('i18n-plus-manager');
 
-        // Header and Refresh Button
-        const headerDiv = contentEl.createDiv({ cls: 'i18n-plus-header' });
-        headerDiv.createEl('h2', { text: t('manager.title') });
+        // Header: Compact Layout (Title + Subtitle on Left, Search + Refresh on Right)
+        const headerDiv = container.createDiv({ cls: 'i18n-plus-manager-header' });
 
-        // Refresh Button
-        new Setting(headerDiv)
-            .addButton(btn => btn
-                .setIcon('refresh-cw')
-                .setTooltip(t('manager.refresh_tooltip'))
-                .onClick(() => {
-                    void this.plugin.dictionaryStore.autoLoadDictionaries().then(count => {
-                        new Notice(t('notice.refresh_success', { count }));
-                        void this.onOpen();
-                    });
-                })
-            );
-
-        // Intro
-        contentEl.createEl('p', {
+        // Left side: Title and Stats
+        const titleArea = headerDiv.createDiv({ cls: 'i18n-plus-header-left' });
+        titleArea.createEl('h2', { text: t('manager.title'), cls: 'i18n-plus-header-title' });
+        titleArea.createEl('div', {
             text: 'Manage and customize translations for your Obsidian plugins.',
-            cls: 'setting-item-description'
+            cls: 'setting-item-description i18n-plus-header-subtitle'
         });
+
+        // Right side: Controls
+        const controlArea = headerDiv.createDiv({ cls: 'i18n-plus-header-right' });
+
+        // Search Input
+        const searchContainer = controlArea.createDiv({ cls: 'i18n-plus-search-container' });
+        const searchInput = searchContainer.createEl('input', {
+            cls: 'i18n-plus-search-input',
+            attr: {
+                type: 'text',
+                placeholder: 'Search plugins...',
+            }
+        });
+
+        // Refresh Button (Icon Only)
+        const refreshBtn = controlArea.createEl('button', {
+            cls: 'clickable-icon i18n-plus-refresh-btn'
+        });
+        setIcon(refreshBtn, 'refresh-cw');
+        refreshBtn.setAttribute('aria-label', t('manager.refresh_tooltip'));
+        refreshBtn.onclick = () => {
+            void this.plugin.dictionaryStore.autoLoadDictionaries().then(count => {
+                new Notice(t('notice.refresh_success', { count }));
+                void this.render(container);
+            });
+        };
 
         // Get Data
         const manager = getI18nPlusManager();
         const registeredPlugins = manager.getRegisteredPlugins();
         const installedDicts = await this.store.listAllDictionaries();
 
-        // Section: Registered Plugins
-        const pluginHeader = contentEl.createDiv({ cls: 'i18n-plus-section-header' });
-        pluginHeader.createEl('h3', { text: t('manager.registered_plugins', { count: registeredPlugins.length }) });
+        // Main List Container
+        const pluginListContainer = container.createDiv({ cls: 'i18n-plus-plugin-list' });
 
-        if (registeredPlugins.length === 0) {
-            contentEl.createEl('p', {
-                text: 'No plugins currently using i18n-plus framework.',
-                cls: 'setting-item-description'
-            });
-        } else {
-            const pluginList = contentEl.createDiv({ cls: 'i18n-plus-plugin-list' });
-            for (const pluginId of registeredPlugins) {
-                this.renderPluginSection(pluginList, pluginId, installedDicts);
+        const renderFilteredList = (query: string) => {
+            pluginListContainer.empty();
+            const filteredPlugins = registeredPlugins.filter(id =>
+                id.toLowerCase().includes(query.toLowerCase())
+            );
+
+            // Section: Registered Plugins Header
+            const pluginHeader = pluginListContainer.createDiv({ cls: 'i18n-plus-section-header' });
+            pluginHeader.createEl('h3', { text: t('manager.registered_plugins', { count: filteredPlugins.length }) });
+
+            if (filteredPlugins.length === 0) {
+                pluginListContainer.createEl('p', {
+                    text: query ? 'No plugins matching your search.' : 'No plugins currently using i18n-plus framework.',
+                    cls: 'setting-item-description'
+                });
+            } else {
+                for (const pluginId of filteredPlugins) {
+                    this.renderPluginSection(pluginListContainer, pluginId, installedDicts);
+                }
             }
-        }
 
-        // Section: Orphan Dictionaries
-        const orphanDicts = installedDicts.filter(d => !registeredPlugins.includes(d.pluginId));
-        if (orphanDicts.length > 0) {
-            this.renderOrphanSection(contentEl, orphanDicts);
-        }
+            // Section: Orphan Dictionaries (only if no search or matches)
+            const orphanDicts = installedDicts.filter(d => !registeredPlugins.includes(d.pluginId));
+            if (orphanDicts.length > 0) {
+                const filteredOrphans = orphanDicts.filter(d =>
+                    !query || d.pluginId.toLowerCase().includes(query.toLowerCase())
+                );
+
+                if (filteredOrphans.length > 0) {
+                    this.renderOrphanSection(pluginListContainer, filteredOrphans);
+                }
+            }
+        };
+
+        // Initial render
+        renderFilteredList('');
+
+        // Search event
+        searchInput.oninput = () => {
+            renderFilteredList(searchInput.value);
+        };
     }
 
     /**
@@ -155,9 +192,11 @@ export class DictionaryManagerModal extends Modal {
             manager.setGlobalLocale(dropdown.value);
             new Notice(t('notice.switched_locale', { pluginId, locale: dropdown.value }));
 
-            // Hot reload: if switching i18n-plus own language, re-render the modal
+            // Hot reload: if switching i18n-plus own language, use FloatingWidget refresh
             if (pluginId === 'i18n-plus') {
-                void this.onOpen();
+                setTimeout(() => {
+                    this.plugin.floatingWidget?.refresh();
+                }, 50);
             }
         };
 
@@ -243,7 +282,7 @@ export class DictionaryManagerModal extends Modal {
         setIcon(viewBtn, 'eye');
         viewBtn.onclick = (e) => {
             e.stopPropagation();
-            new DictionaryEditorModal(this.app, this.plugin, dict.pluginId, dict.locale, false).open();
+            this.plugin.showDictionaryEditor(dict.pluginId, dict.locale);
         };
 
         // Export
@@ -298,7 +337,7 @@ export class DictionaryManagerModal extends Modal {
                 .onClick(() => {
                     void this.store.deleteDictionary(dict.pluginId, dict.locale).then(() => {
                         new Notice(t('notice.deleted_orphan', { pluginId: dict.pluginId, locale: dict.locale }));
-                        void this.onOpen();
+                        this.plugin.floatingWidget?.refresh();
                     });
                 })
             );
@@ -321,7 +360,7 @@ export class DictionaryManagerModal extends Modal {
 
             if (result.valid) {
                 new Notice(t('notice.import_success', { pluginId }));
-                void this.onOpen();
+                this.plugin.floatingWidget?.refresh();
             } else {
                 const errorMsg = result.errors?.map(e => e.message).join(', ') || 'Unknown validation error';
                 new Notice(t('notice.import_failed', { error: errorMsg }));
@@ -401,7 +440,7 @@ export class DictionaryManagerModal extends Modal {
                 manager.unloadDictionary(dict.pluginId, dict.locale);
                 await this.store.deleteDictionary(dict.pluginId, dict.locale);
                 new Notice(t('notice.removed_dict', { locale: dict.locale }));
-                void this.onOpen();
+                this.plugin.floatingWidget?.refresh();
             }
         ).open();
     }
@@ -462,24 +501,14 @@ export class DictionaryManagerModal extends Modal {
                 // 4. Update UI
                 new Notice(t('notice.created_dict', { locale: selectedLocale.code }));
 
-                // Refresh Manager UI
-                await this.onOpen();
-
                 // 5. Open Editor immediately
-                // Find the section and expand it if needed? (Manager UI rebuilds, so might need to wait or rely on user)
-                // Actually, let's just open the editor. The Manager background will refresh when we come back.
-                new DictionaryEditorModal(this.app, this.plugin, pluginId, selectedLocale.code, false).open();
+                this.plugin.showDictionaryEditor(pluginId, selectedLocale.code);
 
             } catch (error) {
                 console.error('[i18n-plus] Failed to create dictionary:', error);
                 new Notice(t('notice.create_failed', { error: error instanceof Error ? error.message : String(error) }));
             }
         }).open();
-    }
-
-    onClose() {
-        const { contentEl } = this;
-        contentEl.empty();
     }
 }
 
@@ -491,6 +520,7 @@ interface LocaleOption {
 
 /**
  * Modal to select a locale
+ * This remains a Modal because it's a short-lived interaction over the top of UI.
  */
 class LocaleSuggestModal extends SuggestModal<LocaleOption> {
     private options: LocaleOption[];
@@ -524,6 +554,7 @@ class LocaleSuggestModal extends SuggestModal<LocaleOption> {
 
 /**
  * Simple Confirmation Modal
+ * This remains a Modal for blocking confirmation.
  */
 class ConfirmModal extends Modal {
     private title: string;

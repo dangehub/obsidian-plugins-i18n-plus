@@ -8,12 +8,15 @@ import { Notice, Plugin } from 'obsidian';
 import { initGlobalAPI, destroyGlobalAPI, getI18nPlusManager } from './framework';
 import { DEFAULT_SETTINGS, I18nPlusSettings, I18nPlusSettingTab } from './settings';
 import { DictionaryStore } from './services/dictionary-store';
-import { DictionaryManagerModal } from './ui/dictionary-manager';
+import { DictionaryManagerView } from './ui/dictionary-manager';
+import { DictionaryEditorView } from './ui/dictionary-editor-modal';
+import { I18nFloatingWidget } from './ui/floating-widget';
 import { initSelfI18n, t } from './lang';
 
 export default class I18nPlusPlugin extends Plugin {
 	settings: I18nPlusSettings;
 	dictionaryStore: DictionaryStore;
+	floatingWidget: I18nFloatingWidget | null = null;
 
 	async onload() {
 		if (this.settings?.debugMode) console.debug('[i18n-plus] Loading plugin...');
@@ -22,6 +25,10 @@ export default class I18nPlusPlugin extends Plugin {
 
 		// Initialize dictionary store (must be before initGlobalAPI as event listeners need it)
 		this.dictionaryStore = new DictionaryStore(this.app, this);
+
+		// Initialize Floating Widget
+		this.floatingWidget = new I18nFloatingWidget(this.app, this);
+		this.floatingWidget.onload();
 
 		// Get manager instance and set up event listeners first
 		// This ensures we capture plugin registrations when initGlobalAPI triggers i18n-plus:ready
@@ -84,7 +91,7 @@ export default class I18nPlusPlugin extends Plugin {
 			id: 'open-dictionary-manager',
 			name: 'Open dictionary manager',
 			callback: () => {
-				new DictionaryManagerModal(this.app, this).open();
+				this.showDictionaryManager();
 			}
 		});
 
@@ -114,7 +121,7 @@ export default class I18nPlusPlugin extends Plugin {
 
 		// Add ribbon icon - click to open dictionary manager
 		this.addRibbonIcon('languages', t('manager.title'), () => {
-			new DictionaryManagerModal(this.app, this).open();
+			this.showDictionaryManager();
 		});
 
 		// Delayed auto-load of installed dictionaries (wait for other plugins to register)
@@ -138,8 +145,38 @@ export default class I18nPlusPlugin extends Plugin {
 	}
 
 	onunload() {
+		if (this.floatingWidget) {
+			this.floatingWidget.onunload();
+			this.floatingWidget = null;
+		}
 		destroyGlobalAPI();
 		if (this.settings.debugMode) console.debug('[i18n-plus] Plugin unloaded');
+	}
+
+	showDictionaryManager() {
+		if (!this.floatingWidget) return;
+
+		// If widget is collapsed, this expands it automatically via showView
+		const view = new DictionaryManagerView(this.app, this);
+		this.floatingWidget.showView(
+			(container) => view.render(container),
+			t('manager.title')
+		);
+	}
+
+	showDictionaryEditor(pluginId: string, locale: string) {
+		if (!this.floatingWidget) return;
+
+		const manager = getI18nPlusManager();
+		const translator = manager.getTranslator(pluginId);
+		// Check both builtin and external locales. For pure external dicts, it's not builtin.
+		const isBuiltin = translator?.getBuiltinLocales().includes(locale) || false;
+
+		const view = new DictionaryEditorView(this.app, this, pluginId, locale, isBuiltin);
+		this.floatingWidget.showView(
+			(container) => view.render(container),
+			`${pluginId} / ${locale}`
+		);
 	}
 
 	async loadSettings() {
