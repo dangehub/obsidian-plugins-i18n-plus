@@ -9,7 +9,7 @@
  * - Unloading dictionaries
  */
 
-import { App, Modal, Setting, Notice } from 'obsidian';
+import { App, Modal, Setting, Notice, setIcon } from 'obsidian';
 import type I18nPlusPlugin from '../main';
 import { getI18nPlusManager } from '../framework/global-api';
 import { DictionaryStore, DictionaryFileInfo } from '../services/dictionary-store';
@@ -35,7 +35,7 @@ export class DictionaryManagerModal extends Modal {
 
         // Header and Refresh Button
         const headerDiv = contentEl.createDiv({ cls: 'i18n-plus-header' });
-        headerDiv.createEl('h2', { text: 'I18n+ Dictionary Manager' });
+        headerDiv.createEl('h2', { text: 'I18n+ dictionary manager' });
 
         // Refresh Button
         new Setting(headerDiv)
@@ -120,7 +120,7 @@ export class DictionaryManagerModal extends Modal {
 
         // Collapse Icon (Lucide Chevron)
         const iconSpan = titleArea.createSpan({ cls: 'i18n-plus-collapse-icon' });
-        iconSpan.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down"><path d="m6 9 6 6 6-6"/></svg>';
+        setIcon(iconSpan, 'chevron-down');
 
         const info = titleArea.createDiv({ cls: 'setting-item-info' });
         info.createDiv({ cls: 'setting-item-name', text: pluginId });
@@ -156,8 +156,8 @@ export class DictionaryManagerModal extends Modal {
 
         // Import Button
         const importBtn = controls.createEl('button', { cls: 'clickable-icon' });
-        importBtn.setAttribute('aria-label', 'Import Dictionary');
-        importBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-up"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M12 12v6"/><path d="m15 15-3-3-3 3"/></svg>';
+        importBtn.setAttribute('aria-label', 'Import dictionary');
+        setIcon(importBtn, 'file-up');
         importBtn.onclick = () => this.importDictionaryForPlugin(pluginId);
 
         // --- Card Body ---
@@ -200,8 +200,8 @@ export class DictionaryManagerModal extends Modal {
 
         const controls = inner.createDiv({ cls: 'setting-item-control' });
         const exportBtn = controls.createEl('button', { cls: 'clickable-icon' });
-        exportBtn.setAttribute('aria-label', 'Export Template');
-        exportBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-download"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+        exportBtn.setAttribute('aria-label', 'Export template');
+        setIcon(exportBtn, 'download');
         exportBtn.onclick = () => this.exportBuiltinDictionary(pluginId, locale);
     }
 
@@ -224,13 +224,13 @@ export class DictionaryManagerModal extends Modal {
         // Export
         const exportBtn = controls.createEl('button', { cls: 'clickable-icon' });
         exportBtn.setAttribute('aria-label', 'Export');
-        exportBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-download"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+        setIcon(exportBtn, 'download');
         exportBtn.onclick = () => this.exportDictionary(dict);
 
         // Delete
         const deleteBtn = controls.createEl('button', { cls: 'clickable-icon mod-warning' });
         deleteBtn.setAttribute('aria-label', 'Remove');
-        deleteBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trash-2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>';
+        setIcon(deleteBtn, 'trash-2');
         deleteBtn.onclick = () => this.unloadDictionary(dict);
     }
 
@@ -241,12 +241,11 @@ export class DictionaryManagerModal extends Modal {
         const section = container.createDiv({ cls: 'i18n-plus-plugin-section is-collapsed' });
 
         // --- Header ---
-        const header = section.createDiv({ cls: 'i18n-plus-card-header' });
-        header.style.borderLeft = '4px solid var(--color-red)';
+        const header = section.createDiv({ cls: 'i18n-plus-card-header i18n-plus-orphan-header' });
 
         const titleArea = header.createDiv({ cls: 'i18n-plus-card-title' });
         const iconSpan = titleArea.createSpan({ cls: 'i18n-plus-collapse-icon' });
-        iconSpan.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down"><path d="m6 9 6 6 6-6"/></svg>';
+        setIcon(iconSpan, 'chevron-down');
 
         const info = titleArea.createDiv({ cls: 'setting-item-info' });
         info.createDiv({ cls: 'setting-item-name', text: `⚠️ Orphan Dictionaries (${dicts.length})` });
@@ -313,7 +312,7 @@ export class DictionaryManagerModal extends Modal {
     private async exportDictionary(dict: DictionaryFileInfo) {
         const blob = await this.store.exportToBlob(dict.pluginId, dict.locale);
         if (!blob) {
-            new Notice('Export failed: Could not read file');
+            new Notice('Export failed: could not read file');
             return;
         }
 
