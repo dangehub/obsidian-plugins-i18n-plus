@@ -227,8 +227,8 @@ export class DictionaryManagerModal extends Modal {
         setIcon(exportBtn, 'download');
         exportBtn.onclick = () => this.exportDictionary(dict);
 
-        // Delete
-        const deleteBtn = controls.createEl('button', { cls: 'clickable-icon mod-warning' });
+        // Delete - use div instead of button to avoid button.mod-warning red background
+        const deleteBtn = controls.createDiv({ cls: 'clickable-icon mod-warning' });
         deleteBtn.setAttribute('aria-label', 'Remove');
         setIcon(deleteBtn, 'trash-2');
         deleteBtn.onclick = () => this.unloadDictionary(dict);
