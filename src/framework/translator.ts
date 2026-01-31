@@ -29,6 +29,7 @@ export class I18nTranslator<T extends Dictionary = Dictionary> implements I18nTr
     private _currentLocale: string;
     private readonly baseDictionary: T;
     private readonly dictionaries: Map<string, Dictionary> = new Map();
+    private readonly builtinLocales: Set<string> = new Set();
     private readonly onValidationError?: (result: ValidationResult) => void;
 
     constructor(options: TranslatorOptions<T>) {
@@ -40,6 +41,7 @@ export class I18nTranslator<T extends Dictionary = Dictionary> implements I18nTr
 
         // Store base dictionary in map
         this.dictionaries.set(this.baseLocale, this.baseDictionary);
+        this.builtinLocales.add(this.baseLocale);
     }
 
     get currentLocale(): string {
@@ -151,6 +153,17 @@ export class I18nTranslator<T extends Dictionary = Dictionary> implements I18nTr
     }
 
     /**
+     * Load dictionary as builtin
+     */
+    loadBuiltinDictionary(locale: string, dict: Dictionary): ValidationResult {
+        const result = this.loadDictionary(locale, dict);
+        if (result.valid) {
+            this.builtinLocales.add(locale);
+        }
+        return result;
+    }
+
+    /**
      * Unload dictionary
      */
     unloadDictionary(locale: string): void {
@@ -194,17 +207,17 @@ export class I18nTranslator<T extends Dictionary = Dictionary> implements I18nTr
     }
 
     /**
-     * Get builtin locales list (only baseLocale)
+     * Get builtin locales list
      */
     getBuiltinLocales(): string[] {
-        return [this.baseLocale];
+        return Array.from(this.builtinLocales);
     }
 
     /**
      * Get external locales list
      */
     getExternalLocales(): string[] {
-        return Array.from(this.dictionaries.keys()).filter(l => l !== this.baseLocale);
+        return Array.from(this.dictionaries.keys()).filter(l => !this.builtinLocales.has(l));
     }
 
     getDictionary(locale: string): Dictionary | undefined {
@@ -213,6 +226,17 @@ export class I18nTranslator<T extends Dictionary = Dictionary> implements I18nTr
         }
         return this.dictionaries.get(locale);
     }
+
+    /**
+     * Get builtin dictionary
+     */
+    getBuiltinDictionary(locale: string): Dictionary | undefined {
+        if (this.builtinLocales.has(locale)) {
+            return this.dictionaries.get(locale);
+        }
+        return undefined;
+    }
+
 
 
     /**

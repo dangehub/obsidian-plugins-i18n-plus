@@ -4,6 +4,7 @@
 
 import { App, PluginSettingTab, Setting } from 'obsidian';
 import type I18nPlusPlugin from './main';
+import { t } from './lang';
 
 export interface I18nPlusSettings {
 	/** Whether to show debug logs */
@@ -30,8 +31,8 @@ export class I18nPlusSettingTab extends PluginSettingTab {
 		containerEl.empty();
 
 		new Setting(containerEl)
-			.setName('Debug mode')
-			.setDesc('Show detailed logs in the console')
+			.setName(t('settings.debug_mode'))
+			.setDesc(t('settings.debug_mode_desc'))
 			.addToggle(toggle => toggle
 				.setValue(this.plugin.settings.debugMode)
 				.onChange(async (value) => {
@@ -40,7 +41,7 @@ export class I18nPlusSettingTab extends PluginSettingTab {
 				}));
 
 		// Display registered plugins info
-		new Setting(containerEl).setName('Registered plugins').setHeading();
+		new Setting(containerEl).setName(t('settings.registered_plugins')).setHeading();
 
 		const pluginListEl = containerEl.createDiv({ cls: 'i18n-plus-plugin-list' });
 
@@ -56,7 +57,7 @@ export class I18nPlusSettingTab extends PluginSettingTab {
 					const locales = window.i18nPlus.getLoadedLocales(pluginId);
 					new Setting(pluginListEl)
 						.setName(pluginId)
-						.setDesc(`Loaded locales: ${locales.join(', ') || 'none'}`);
+						.setDesc(t('settings.loaded_locales', { locales: locales.join(', ') || 'none' }));
 				}
 			}
 		} else {

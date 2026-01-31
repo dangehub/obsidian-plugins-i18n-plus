@@ -482,3 +482,111 @@
 .i18n-plus-confirm-modal .modal-button-container button {
     min-width: 80px;
 }
+
+/* ============================================================================
+   Row Header Layout (for editable translation mode)
+   ============================================================================ */
+
+/* Key header row - spans full width */
+.i18n-plus-editor-key-row {
+    background: var(--background-secondary-alt);
+}
+
+.i18n-plus-editor-cell-key-header {
+    padding: 6px 12px;
+    border-bottom: none;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.i18n-plus-editor-cell-key-header .i18n-plus-editor-key {
+    font-family: var(--font-monospace);
+    font-size: 11px;
+    color: var(--text-faint);
+}
+
+/* Content row - source and translation columns */
+.i18n-plus-editor-content-row {
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.i18n-plus-editor-content-row:hover {
+    background: var(--background-modifier-hover);
+}
+
+/* Source cell (left column, read-only) */
+.i18n-plus-editor-cell-source {
+    width: 40%;
+    padding: 8px 12px;
+    background: var(--background-secondary);
+    color: var(--text-normal);
+    font-size: 13px;
+    line-height: 1.5;
+    vertical-align: top;
+    border-right: 1px solid var(--background-modifier-border);
+}
+
+.i18n-plus-editor-cell-source .i18n-plus-editor-var-highlight {
+    background: var(--background-modifier-message);
+    color: var(--color-orange);
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-family: var(--font-monospace);
+    font-size: 0.9em;
+}
+
+.i18n-plus-editor-no-source {
+    color: var(--text-faint);
+    font-style: italic;
+}
+
+/* Translation cell (right column, editable) */
+.i18n-plus-editor-cell-translation {
+    width: 60%;
+    padding: 8px 12px;
+    vertical-align: top;
+}
+
+/* Edited state for content row */
+.i18n-plus-editor-content-row.is-edited {
+    background: var(--background-modifier-success);
+}
+
+.i18n-plus-editor-content-row.has-error {
+    background: var(--background-modifier-error);
+}
+
+.i18n-plus-editor-content-row.is-edited .i18n-plus-editor-textarea {
+    border-color: var(--color-green);
+}
+
+.i18n-plus-editor-content-row.has-error .i18n-plus-editor-textarea {
+    border-color: var(--color-red);
+}
+
+/* Table header for editable mode */
+.i18n-plus-editor-th-source,
+.i18n-plus-editor-th-translation {
+    padding: 10px 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    background: var(--background-secondary);
+}
+
+.i18n-plus-editor-th-source {
+    width: 40%;
+    border-right: 1px solid var(--background-modifier-border);
+}
+
+.i18n-plus-editor-th-translation {
+    width: 60%;
+}
+
+/* Placeholder style for empty translations */
+.i18n-plus-editor-textarea::placeholder {
+    color: var(--text-faint);
+    font-style: italic;
+}

@@ -15,6 +15,7 @@ import { getI18nPlusManager } from '../framework/global-api';
 import { DictionaryStore, DictionaryFileInfo } from '../services/dictionary-store';
 import { OBSIDIAN_LOCALES } from '../framework/locales';
 import { DictionaryEditorModal } from './dictionary-editor-modal';
+import { t } from '../lang';
 
 /**
  * Dictionary Manager Modal
@@ -36,16 +37,16 @@ export class DictionaryManagerModal extends Modal {
 
         // Header and Refresh Button
         const headerDiv = contentEl.createDiv({ cls: 'i18n-plus-header' });
-        headerDiv.createEl('h2', { text: 'I18n+ dictionary manager' });
+        headerDiv.createEl('h2', { text: t('manager.title') });
 
         // Refresh Button
         new Setting(headerDiv)
             .addButton(btn => btn
                 .setIcon('refresh-cw')
-                .setTooltip('Reload dictionaries and refresh interface')
+                .setTooltip(t('manager.refresh_tooltip'))
                 .onClick(() => {
                     void this.plugin.dictionaryStore.autoLoadDictionaries().then(count => {
-                        new Notice(`Refreshed. Loaded ${count} dictionaries`);
+                        new Notice(t('notice.refresh_success', { count }));
                         void this.onOpen();
                     });
                 })
@@ -64,7 +65,7 @@ export class DictionaryManagerModal extends Modal {
 
         // Section: Registered Plugins
         const pluginHeader = contentEl.createDiv({ cls: 'i18n-plus-section-header' });
-        pluginHeader.createEl('h3', { text: `Registered Plugins (${registeredPlugins.length})` });
+        pluginHeader.createEl('h3', { text: t('manager.registered_plugins', { count: registeredPlugins.length }) });
 
         if (registeredPlugins.length === 0) {
             contentEl.createEl('p', {
@@ -127,7 +128,7 @@ export class DictionaryManagerModal extends Modal {
         info.createDiv({ cls: 'setting-item-name', text: pluginId });
         info.createDiv({
             cls: 'setting-item-description',
-            text: `${builtinLocales.length} builtin | ${pluginDicts.length} imported locales`
+            text: t('manager.builtin_locales', { count: builtinLocales.length, external: pluginDicts.length })
         });
 
         const controls = cardHeader.createDiv({ cls: 'setting-item-control' });
@@ -152,18 +153,24 @@ export class DictionaryManagerModal extends Modal {
         dropdown.onchange = () => {
             translator.setLocale(dropdown.value);
             manager.setGlobalLocale(dropdown.value);
-            new Notice(`Switched ${pluginId} to ${dropdown.value}`);
+            new Notice(t('notice.switched_locale', { pluginId, locale: dropdown.value }));
+
+            // Hot reload: if switching i18n-plus own language, re-render the modal
+            if (pluginId === 'i18n-plus') {
+                void this.onOpen();
+            }
         };
+
 
         // Import Button
         const importBtn = controls.createEl('button', { cls: 'clickable-icon' });
-        importBtn.setAttribute('aria-label', 'Import dictionary');
+        importBtn.setAttribute('aria-label', t('action.import_dictionary'));
         setIcon(importBtn, 'file-up');
         importBtn.onclick = () => this.importDictionaryForPlugin(pluginId);
 
         // Add Button
         const addBtn = controls.createEl('button', { cls: 'clickable-icon' });
-        addBtn.setAttribute('aria-label', 'Add translation');
+        addBtn.setAttribute('aria-label', t('action.add_translation'));
         setIcon(addBtn, 'plus');
         addBtn.onclick = () => this.createNewDictionary(pluginId);
 
@@ -209,7 +216,7 @@ export class DictionaryManagerModal extends Modal {
 
         // Export template only (builtin dictionaries are part of plugin code, cannot be viewed generically)
         const exportBtn = controls.createEl('button', { cls: 'clickable-icon' });
-        exportBtn.setAttribute('aria-label', 'Export template');
+        exportBtn.setAttribute('aria-label', t('action.export_template'));
         setIcon(exportBtn, 'download');
         exportBtn.onclick = () => this.exportBuiltinDictionary(pluginId, locale);
     }
@@ -232,7 +239,7 @@ export class DictionaryManagerModal extends Modal {
 
         // View Content
         const viewBtn = controls.createEl('button', { cls: 'clickable-icon' });
-        viewBtn.setAttribute('aria-label', 'View content');
+        viewBtn.setAttribute('aria-label', t('action.view_content'));
         setIcon(viewBtn, 'eye');
         viewBtn.onclick = (e) => {
             e.stopPropagation();
@@ -241,13 +248,13 @@ export class DictionaryManagerModal extends Modal {
 
         // Export
         const exportBtn = controls.createEl('button', { cls: 'clickable-icon' });
-        exportBtn.setAttribute('aria-label', 'Export');
+        exportBtn.setAttribute('aria-label', t('action.export'));
         setIcon(exportBtn, 'download');
         exportBtn.onclick = () => this.exportDictionary(dict);
 
         // Delete - use div instead of button to avoid button.mod-warning red background
         const deleteBtn = controls.createDiv({ cls: 'clickable-icon mod-warning' });
-        deleteBtn.setAttribute('aria-label', 'Remove');
+        deleteBtn.setAttribute('aria-label', t('action.remove'));
         setIcon(deleteBtn, 'trash-2');
         deleteBtn.onclick = () => this.unloadDictionary(dict);
     }
@@ -266,10 +273,10 @@ export class DictionaryManagerModal extends Modal {
         setIcon(iconSpan, 'chevron-down');
 
         const info = titleArea.createDiv({ cls: 'setting-item-info' });
-        info.createDiv({ cls: 'setting-item-name', text: `⚠️ Orphan Dictionaries (${dicts.length})` });
+        info.createDiv({ cls: 'setting-item-name', text: t('manager.orphan_section_title', { count: dicts.length }) });
         info.createDiv({
             cls: 'setting-item-description',
-            text: 'Dictionaries remaining for uninstalled or disabled plugins.'
+            text: t('manager.orphan_section_desc')
         });
 
         header.onclick = () => {
@@ -290,7 +297,7 @@ export class DictionaryManagerModal extends Modal {
                 .setWarning()
                 .onClick(() => {
                     void this.store.deleteDictionary(dict.pluginId, dict.locale).then(() => {
-                        new Notice(`Deleted Orphan Dictionary: ${dict.pluginId}-${dict.locale}`);
+                        new Notice(t('notice.deleted_orphan', { pluginId: dict.pluginId, locale: dict.locale }));
                         void this.onOpen();
                     });
                 })
@@ -313,11 +320,11 @@ export class DictionaryManagerModal extends Modal {
             const result = await this.store.importFromFile(file, pluginId);
 
             if (result.valid) {
-                new Notice(`Imported dictionary for ${pluginId}`);
+                new Notice(t('notice.import_success', { pluginId }));
                 void this.onOpen();
             } else {
                 const errorMsg = result.errors?.map(e => e.message).join(', ') || 'Unknown validation error';
-                new Notice(`❌ Import Failed: ${errorMsg}`);
+                new Notice(t('notice.import_failed', { error: errorMsg }));
             }
         };
 
@@ -330,7 +337,7 @@ export class DictionaryManagerModal extends Modal {
     private async exportDictionary(dict: DictionaryFileInfo) {
         const blob = await this.store.exportToBlob(dict.pluginId, dict.locale);
         if (!blob) {
-            new Notice('Export failed: could not read file');
+            new Notice(t('notice.export_failed'));
             return;
         }
 
@@ -341,7 +348,7 @@ export class DictionaryManagerModal extends Modal {
         a.click();
         URL.revokeObjectURL(url);
 
-        new Notice(`Exported ${dict.locale} for ${dict.pluginId}`);
+        new Notice(t('notice.export_success', { locale: dict.locale, pluginId: dict.pluginId }));
     }
 
     /**
@@ -351,7 +358,7 @@ export class DictionaryManagerModal extends Modal {
         const i18nPlusApi = window.i18nPlus;
         const translator = i18nPlusApi?.getTranslator(pluginId);
         if (!translator) {
-            new Notice('Unable to get translator instance');
+            new Notice(t('notice.translator_not_found'));
             return;
         }
 
@@ -378,7 +385,7 @@ export class DictionaryManagerModal extends Modal {
         a.download = `${pluginId}.${locale}.json`;
         a.click();
         URL.revokeObjectURL(url);
-        new Notice(`Exported builtin template: ${locale}`);
+        new Notice(t('notice.export_builtin_success', { locale }));
     }
 
     /**
@@ -386,14 +393,14 @@ export class DictionaryManagerModal extends Modal {
      */
     private unloadDictionary(dict: DictionaryFileInfo) {
         new ConfirmModal(this.app,
-            `Delete dictionary ${dict.pluginId}/${dict.locale}?`,
-            'This action cannot be undone.',
-            'Delete',
+            t('manager.delete_confirm_title'),
+            t('manager.delete_confirm_message', { pluginId: dict.pluginId, locale: dict.locale }),
+            t('action.delete'),
             async () => {
                 const manager = getI18nPlusManager();
                 manager.unloadDictionary(dict.pluginId, dict.locale);
                 await this.store.deleteDictionary(dict.pluginId, dict.locale);
-                new Notice(`Removed ${dict.locale} dictionary`);
+                new Notice(t('notice.removed_dict', { locale: dict.locale }));
                 void this.onOpen();
             }
         ).open();
@@ -420,7 +427,7 @@ export class DictionaryManagerModal extends Modal {
                 const baseDict = translator.getDictionary(baseLocale);
 
                 if (!baseDict) {
-                    new Notice(`Error: Base dictionary (${baseLocale}) not found`);
+                    new Notice(t('notice.base_dict_not_found', { locale: baseLocale }));
                     return;
                 }
 
@@ -453,7 +460,7 @@ export class DictionaryManagerModal extends Modal {
                 manager.loadDictionary(pluginId, selectedLocale.code, newDict);
 
                 // 4. Update UI
-                new Notice(`Created dictionary: ${selectedLocale.code}`);
+                new Notice(t('notice.created_dict', { locale: selectedLocale.code }));
 
                 // Refresh Manager UI
                 await this.onOpen();
@@ -465,7 +472,7 @@ export class DictionaryManagerModal extends Modal {
 
             } catch (error) {
                 console.error('[i18n-plus] Failed to create dictionary:', error);
-                new Notice(`Failed to create dictionary: ${error instanceof Error ? error.message : String(error)}`);
+                new Notice(t('notice.create_failed', { error: error instanceof Error ? error.message : String(error) }));
             }
         }).open();
     }
@@ -493,7 +500,7 @@ class LocaleSuggestModal extends SuggestModal<LocaleOption> {
         super(app);
         this.options = options;
         this.onSelect = onSelect;
-        this.setPlaceholder('Select language...');
+        this.setPlaceholder(t('locale_suggest.placeholder'));
     }
 
     getSuggestions(query: string): LocaleOption[] {
@@ -541,7 +548,7 @@ class ConfirmModal extends Modal {
 
         const div = contentEl.createDiv({ cls: 'modal-button-container' });
 
-        const btnCancel = div.createEl('button', { text: 'Cancel' });
+        const btnCancel = div.createEl('button', { text: t('action.cancel') });
         btnCancel.onclick = () => this.close();
 
         const btnConfirm = div.createEl('button', { text: this.ctaText, cls: 'mod-warning' });

@@ -9,6 +9,7 @@ import { initGlobalAPI, destroyGlobalAPI, getI18nPlusManager } from './framework
 import { DEFAULT_SETTINGS, I18nPlusSettings, I18nPlusSettingTab } from './settings';
 import { DictionaryStore } from './services/dictionary-store';
 import { DictionaryManagerModal } from './ui/dictionary-manager';
+import { initSelfI18n, t } from './lang';
 
 export default class I18nPlusPlugin extends Plugin {
 	settings: I18nPlusSettings;
@@ -72,6 +73,9 @@ export default class I18nPlusPlugin extends Plugin {
 		// Initialize global API (this triggers i18n-plus:ready event, causing other plugins to register)
 		initGlobalAPI();
 
+		// Self-i18n initialization (MUST be after initGlobalAPI so window.i18nPlus is available)
+		initSelfI18n(this);
+
 		// Add settings tab
 		this.addSettingTab(new I18nPlusSettingTab(this.app, this));
 
@@ -91,9 +95,9 @@ export default class I18nPlusPlugin extends Plugin {
 				const manager = getI18nPlusManager();
 				const plugins = manager.getRegisteredPlugins();
 				if (plugins.length === 0) {
-					new Notice('No plugins registered to i18n-plus');
+					new Notice(t('notice.no_plugins'));
 				} else {
-					new Notice(`Registered: ${plugins.join(', ')}`);
+					new Notice(t('notice.registered_plugins', { plugins: plugins.join(', ') }));
 				}
 			}
 		});
@@ -103,13 +107,13 @@ export default class I18nPlusPlugin extends Plugin {
 			name: 'Reload all dictionaries',
 			callback: () => {
 				void this.dictionaryStore.autoLoadDictionaries().then(count => {
-					new Notice(`Loaded ${count} dictionaries`);
+					new Notice(t('notice.loaded_dicts', { count }));
 				});
 			}
 		});
 
 		// Add ribbon icon - click to open dictionary manager
-		this.addRibbonIcon('languages', 'I18n plus dictionary manager', () => {
+		this.addRibbonIcon('languages', t('manager.title'), () => {
 			new DictionaryManagerModal(this.app, this).open();
 		});
 

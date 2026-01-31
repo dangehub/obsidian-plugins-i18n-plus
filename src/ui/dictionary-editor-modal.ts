@@ -13,6 +13,7 @@ import type I18nPlusPlugin from '../main';
 import { DictionaryStore } from '../services/dictionary-store';
 import { getI18nPlusManager } from '../framework/global-api';
 import type { Dictionary, DictionaryMeta } from '../framework/types';
+import { t } from '../lang';
 
 // ============================================================================
 // Data Models
@@ -23,6 +24,7 @@ interface DictionaryEntry {
     key: string;
     value: string;              // Current value (may be edited)
     originalValue: string;      // Original value for comparison
+    baseValue?: string;         // Reference value from base locale (e.g., English)
     hasVariables: boolean;
     variables: string[];        // Expected variables from original
     isEdited: boolean;          // Has been modified
@@ -40,6 +42,8 @@ interface EditorState {
     isReadOnly: boolean;
     hasUnsavedChanges: boolean;  // Track if any entry is edited
     originalDict?: Dictionary;   // Keep original to preserve $meta and other fields
+    baseDict?: Dictionary;       // Base locale dictionary for reference (e.g., English)
+    baseLocale?: string;         // Base locale identifier
     showMissingOnly: boolean;    // Filter: Show only missing translations
 }
 
@@ -165,6 +169,17 @@ export class DictionaryEditorModal extends Modal {
         const manager = getI18nPlusManager();
         const translator = manager.getTranslator(this.state.pluginId);
 
+        // Load base dictionary for reference (used when translating)
+        if (translator) {
+            this.state.baseLocale = translator.baseLocale;
+            // Get base dictionary (the source language, usually English)
+            if (typeof translator.getBuiltinDictionary === 'function') {
+                this.state.baseDict = translator.getBuiltinDictionary(translator.baseLocale) as Dictionary ?? undefined;
+            } else {
+                this.state.baseDict = translator.getDictionary(translator.baseLocale) ?? undefined;
+            }
+        }
+
         if (this.state.isBuiltin && translator) {
             // Try getBuiltinDictionary first (new interface), fallback to getDictionary
             if (typeof translator.getBuiltinDictionary === 'function') {
@@ -191,16 +206,27 @@ export class DictionaryEditorModal extends Modal {
         this.state.filteredEntries = [...this.state.entries];
     }
 
+
     private parseEntries(dict: Dictionary): DictionaryEntry[] {
         const entries: DictionaryEntry[] = [];
+        const baseDict = this.state.baseDict;
 
         for (const [key, value] of Object.entries(dict)) {
             if (typeof value === 'string') {
-                const { hasVariables, variables } = detectVariables(value);
+                // Get base value from base dictionary (for reference)
+                const baseValue = baseDict && typeof baseDict[key] === 'string'
+                    ? baseDict[key] as string
+                    : undefined;
+
+                // Use base value for variable detection if current value is empty
+                const sourceForVars = value || baseValue || '';
+                const { hasVariables, variables } = detectVariables(sourceForVars);
+
                 entries.push({
                     key,
                     value,
                     originalValue: value,
+                    baseValue,
                     hasVariables,
                     variables,
                     isEdited: false,
@@ -212,6 +238,7 @@ export class DictionaryEditorModal extends Modal {
         entries.sort((a, b) => a.key.localeCompare(b.key));
         return entries;
     }
+
 
     // ========================================================================
     // Rendering
@@ -256,7 +283,7 @@ export class DictionaryEditorModal extends Modal {
 
         const searchInput = searchContainer.createEl('input', {
             type: 'text',
-            placeholder: 'Search entries...',
+            placeholder: t('editor.search_placeholder'),
             cls: 'i18n-plus-editor-search-input'
         });
 
@@ -277,7 +304,7 @@ export class DictionaryEditorModal extends Modal {
         cb.checked = this.state.showMissingOnly;
 
         filterContainer.createEl('label', {
-            text: 'Missing only',
+            text: t('editor.show_missing_only'),
             attr: { for: 'i18n-plus-filter-missing' }
         });
 
@@ -313,21 +340,29 @@ export class DictionaryEditorModal extends Modal {
         if (this.state.filteredEntries.length === 0) {
             const empty = this.contentContainer.createDiv({ cls: 'i18n-plus-editor-empty' });
             if (this.state.searchQuery) {
-                empty.textContent = 'No entries match your search.';
+                empty.textContent = t('editor.no_match');
             } else {
-                empty.textContent = 'No entries in this dictionary.';
+                empty.textContent = t('editor.no_entries');
             }
             return;
         }
 
-        // Create table
+        // Create table with new layout
         const table = this.contentContainer.createEl('table', { cls: 'i18n-plus-editor-table' });
 
-        // Header row
-        const thead = table.createEl('thead');
-        const headerRow = thead.createEl('tr');
-        headerRow.createEl('th', { text: 'Key', cls: 'i18n-plus-editor-th-key' });
-        headerRow.createEl('th', { text: 'Value', cls: 'i18n-plus-editor-th-value' });
+        // Header row - only show SOURCE and TRANSLATION for editable mode
+        if (!this.state.isReadOnly) {
+            const thead = table.createEl('thead');
+            const headerRow = thead.createEl('tr');
+            headerRow.createEl('th', { text: t('editor.table_source'), cls: 'i18n-plus-editor-th-source' });
+            headerRow.createEl('th', { text: t('editor.table_translation'), cls: 'i18n-plus-editor-th-translation' });
+        } else {
+            // Read-only mode: KEY and VALUE
+            const thead = table.createEl('thead');
+            const headerRow = thead.createEl('tr');
+            headerRow.createEl('th', { text: t('editor.table_key'), cls: 'i18n-plus-editor-th-key' });
+            headerRow.createEl('th', { text: t('editor.table_value'), cls: 'i18n-plus-editor-th-value' });
+        }
 
         // Body
         const tbody = table.createEl('tbody');
@@ -336,59 +371,100 @@ export class DictionaryEditorModal extends Modal {
         }
     }
 
+
+
     private renderEntryRow(tbody: HTMLElement, entry: DictionaryEntry): void {
-        const row = tbody.createEl('tr', {
-            cls: `i18n-plus-editor-row ${entry.isEdited ? 'is-edited' : ''} ${entry.validationError ? 'has-error' : ''}`
-        });
+        // For editable mode: use row header layout
+        if (!this.state.isReadOnly) {
+            // Row 1: Key header row (spans 2 columns)
+            const keyRow = tbody.createEl('tr', { cls: 'i18n-plus-editor-key-row' });
+            const keyCell = keyRow.createEl('td', {
+                cls: 'i18n-plus-editor-cell-key-header',
+                attr: { colspan: '2' }
+            });
 
-        // Key cell
-        const keyCell = row.createEl('td', { cls: 'i18n-plus-editor-cell-key' });
-        keyCell.createSpan({ text: entry.key, cls: 'i18n-plus-editor-key' });
+            // Key name
+            keyCell.createSpan({ text: entry.key, cls: 'i18n-plus-editor-key' });
 
-        // Variable warning icon
-        if (entry.hasVariables) {
-            const warning = keyCell.createSpan({ cls: 'i18n-plus-editor-var-warning' });
-            setIcon(warning, 'alert-triangle');
-            warning.setAttribute('aria-label', `Variables: ${entry.variables.join(', ')}`);
-            warning.setAttribute('title', `Contains variables: ${entry.variables.join(', ')}\nDo not translate these placeholders.`);
-        }
+            // Variable warning icon
+            if (entry.hasVariables) {
+                const warning = keyCell.createSpan({ cls: 'i18n-plus-editor-var-warning' });
+                setIcon(warning, 'alert-triangle');
+                warning.setAttribute('aria-label', `Variables: ${entry.variables.join(', ')}`);
+                warning.setAttribute('title', `Contains variables: ${entry.variables.join(', ')}\nDo not translate these placeholders.`);
+            }
 
-        // Validation error icon
-        if (entry.validationError) {
-            const errorIcon = keyCell.createSpan({ cls: 'i18n-plus-editor-error-icon' });
-            setIcon(errorIcon, 'x-circle');
-            errorIcon.setAttribute('title', entry.validationError);
-        }
+            // Validation error icon
+            if (entry.validationError) {
+                const errorIcon = keyCell.createSpan({ cls: 'i18n-plus-editor-error-icon' });
+                setIcon(errorIcon, 'x-circle');
+                errorIcon.setAttribute('title', entry.validationError);
+            }
 
-        // Value cell
-        const valueCell = row.createEl('td', { cls: 'i18n-plus-editor-cell-value' });
+            // Row 2: Source + Translation content row
+            const contentRow = tbody.createEl('tr', {
+                cls: `i18n-plus-editor-content-row ${entry.isEdited ? 'is-edited' : ''} ${entry.validationError ? 'has-error' : ''}`
+            });
 
-        if (this.state.isReadOnly) {
-            // Read-only mode: display text with variable highlighting
+            // Source cell (read-only, shows base/English value)
+            const sourceCell = contentRow.createEl('td', { cls: 'i18n-plus-editor-cell-source' });
+            if (entry.baseValue) {
+                if (entry.hasVariables) {
+                    this.renderValueWithHighlight(sourceCell, entry.baseValue, entry.variables);
+                } else {
+                    sourceCell.textContent = entry.baseValue;
+                }
+            } else {
+                sourceCell.createSpan({ text: '—', cls: 'i18n-plus-editor-no-source' });
+            }
+
+            // Translation cell (editable textarea)
+            const translationCell = contentRow.createEl('td', { cls: 'i18n-plus-editor-cell-translation' });
+            const textarea = translationCell.createEl('textarea', {
+                cls: 'i18n-plus-editor-textarea',
+                text: entry.value
+            });
+            textarea.rows = Math.min(3, Math.max(1, (entry.value || entry.baseValue || '').split('\n').length));
+
+            // Placeholder shows base value if current value is empty
+            if (!entry.value && entry.baseValue) {
+                textarea.placeholder = entry.baseValue;
+            }
+
+            textarea.addEventListener('input', () => {
+                this.handleEntryEdit(entry, textarea.value);
+                contentRow.className = `i18n-plus-editor-content-row ${entry.isEdited ? 'is-edited' : ''} ${entry.validationError ? 'has-error' : ''}`;
+            });
+
+            textarea.addEventListener('blur', () => {
+                textarea.rows = Math.min(3, Math.max(1, textarea.value.split('\n').length));
+            });
+        } else {
+            // Read-only mode: original two-column layout (KEY | VALUE)
+            const row = tbody.createEl('tr', { cls: 'i18n-plus-editor-row' });
+
+            // Key cell
+            const keyCell = row.createEl('td', { cls: 'i18n-plus-editor-cell-key' });
+            keyCell.createSpan({ text: entry.key, cls: 'i18n-plus-editor-key' });
+
+            if (entry.hasVariables) {
+                const warning = keyCell.createSpan({ cls: 'i18n-plus-editor-var-warning' });
+                setIcon(warning, 'alert-triangle');
+                warning.setAttribute('aria-label', `Variables: ${entry.variables.join(', ')}`);
+                warning.setAttribute('title', `Contains variables: ${entry.variables.join(', ')}\nDo not translate these placeholders.`);
+            }
+
+            // Value cell
+            const valueCell = row.createEl('td', { cls: 'i18n-plus-editor-cell-value' });
             if (entry.hasVariables) {
                 this.renderValueWithHighlight(valueCell, entry.value, entry.variables);
             } else {
                 valueCell.textContent = entry.value;
             }
-        } else {
-            // Editable mode: textarea
-            const textarea = valueCell.createEl('textarea', {
-                cls: 'i18n-plus-editor-textarea',
-                text: entry.value
-            });
-            textarea.rows = Math.min(3, Math.max(1, entry.value.split('\n').length));
-
-            textarea.addEventListener('input', () => {
-                this.handleEntryEdit(entry, textarea.value);
-                row.className = `i18n-plus-editor-row ${entry.isEdited ? 'is-edited' : ''} ${entry.validationError ? 'has-error' : ''}`;
-            });
-
-            textarea.addEventListener('blur', () => {
-                // Adjust row height after editing
-                textarea.rows = Math.min(3, Math.max(1, textarea.value.split('\n').length));
-            });
         }
     }
+
+
 
     private renderValueWithHighlight(container: HTMLElement, value: string, variables: string[]): void {
         // Create a regex that matches any of the variables
@@ -435,7 +511,7 @@ export class DictionaryEditorModal extends Modal {
 
         // Export button
         setting.addButton(btn => btn
-            .setButtonText('Export JSON')
+            .setButtonText(t('editor.export_json'))
             .setIcon('download')
             .onClick(async () => {
                 await this.exportDictionary();
@@ -445,8 +521,8 @@ export class DictionaryEditorModal extends Modal {
         // Metadata Button
         if (!this.state.isReadOnly) {
             setting.addButton(btn => btn
-                .setButtonText('Metadata')
-                .setTooltip('Edit dictionary metadata')
+                .setButtonText(t('editor.metadata'))
+                .setTooltip(t('editor.metadata'))
                 .onClick(() => {
                     if (this.state.originalDict && this.state.originalDict.$meta) {
                         new MetadataEditorModal(
@@ -460,7 +536,7 @@ export class DictionaryEditorModal extends Modal {
                                     } as DictionaryMeta;
                                     this.state.hasUnsavedChanges = true; // Mark as dirty ensuring save picks it up
                                     this.updateSaveButtonState();
-                                    new Notice('Metadata updated (pending save)');
+                                    new Notice(t('notice.metadata_updated'));
                                 }
                             }
                         ).open();
@@ -483,7 +559,7 @@ export class DictionaryEditorModal extends Modal {
 
         // Close button
         setting.addButton(btn => btn
-            .setButtonText('Close')
+            .setButtonText(t('editor.close'))
             .onClick(async () => {
                 if (!this.state.isReadOnly && this.state.hasUnsavedChanges) {
                     await this.confirmClose();
@@ -532,7 +608,7 @@ export class DictionaryEditorModal extends Modal {
         } else {
             this.downloadBlob(blob, `${this.state.pluginId}.${this.state.locale}.json`);
         }
-        new Notice(`Exported ${this.state.locale} dictionary`);
+        new Notice(t('notice.editor_export_success', { locale: this.state.locale }));
     }
 
     private downloadBlob(blob: Blob, filename: string): void {
@@ -626,7 +702,7 @@ export class DictionaryEditorModal extends Modal {
         // Check for validation errors
         const errors = this.state.entries.filter(e => e.validationError);
         if (errors.length > 0) {
-            new Notice(`Cannot save: ${errors.length} entries have validation errors`);
+            new Notice(t('notice.validation_errors', { count: errors.length }));
             return false;
         }
 
@@ -657,12 +733,12 @@ export class DictionaryEditorModal extends Modal {
             }
             this.state.hasUnsavedChanges = false;
 
-            new Notice(`Saved and refreshed ${this.state.locale} dictionary`);
+            new Notice(t('notice.save_success', { locale: this.state.locale }));
             this.renderContent();
             return true;
         } catch (error) {
             console.error('[i18n-plus] Failed to save dictionary:', error);
-            new Notice('Failed to save dictionary');
+            new Notice(t('notice.save_failed'));
             return false;
         }
     }
@@ -689,44 +765,44 @@ class MetadataEditorModal extends Modal {
         const { contentEl } = this;
         contentEl.addClass('i18n-plus-metadata-modal');
 
-        contentEl.createEl('h2', { text: 'Dictionary Metadata' });
+        contentEl.createEl('h2', { text: t('metadata.title') });
 
         // Read-only fields
         new Setting(contentEl)
-            .setName('Plugin ID')
-            .setDesc('Target plugin identifier (Read-only)')
+            .setName(t('metadata.plugin_id'))
+            .setDesc(t('metadata.plugin_id_desc'))
             .addText(text => text.setValue(this.meta.pluginId || '').setDisabled(true));
 
         new Setting(contentEl)
-            .setName('Locale')
-            .setDesc('Target language code (Read-only)')
+            .setName(t('metadata.locale'))
+            .setDesc(t('metadata.locale_desc'))
             .addText(text => text.setValue(this.meta.locale || '').setDisabled(true));
 
         // Editable fields
         new Setting(contentEl)
-            .setName('Dictionary Version')
-            .setDesc('Version of this translation')
+            .setName(t('metadata.dict_version'))
+            .setDesc(t('metadata.dict_version_desc'))
             .addText(text => text
                 .setValue(this.meta.dictVersion || '1.0.0')
                 .onChange(val => this.meta.dictVersion = val));
 
         new Setting(contentEl)
-            .setName('Plugin Version')
-            .setDesc('Target plugin version compatibility')
+            .setName(t('metadata.plugin_version'))
+            .setDesc(t('metadata.plugin_version_desc'))
             .addText(text => text
                 .setValue(this.meta.pluginVersion || '')
                 .onChange(val => this.meta.pluginVersion = val));
 
         new Setting(contentEl)
-            .setName('Author')
-            .setDesc('Translator name or credit')
+            .setName(t('metadata.author'))
+            .setDesc(t('metadata.author_desc'))
             .addText(text => text
                 .setValue(this.meta.author || '')
                 .onChange(val => this.meta.author = val));
 
         new Setting(contentEl)
-            .setName('Description')
-            .setDesc('Optional notes or description')
+            .setName(t('metadata.description'))
+            .setDesc(t('metadata.description_desc'))
             .addTextArea(text => text
                 .setValue(this.meta.description || '')
                 .onChange(val => this.meta.description = val));
@@ -738,10 +814,10 @@ class MetadataEditorModal extends Modal {
 
         new Setting(div)
             .addButton(btn => btn
-                .setButtonText('Cancel')
+                .setButtonText(t('action.cancel'))
                 .onClick(() => this.close()))
             .addButton(btn => btn
-                .setButtonText('Update Metadata')
+                .setButtonText(t('metadata.update'))
                 .setCta()
                 .onClick(() => {
                     this.onSave(this.meta);
