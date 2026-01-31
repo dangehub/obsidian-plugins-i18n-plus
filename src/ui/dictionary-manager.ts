@@ -35,12 +35,12 @@ export class DictionaryManagerModal extends Modal {
 
         // Header and Refresh Button
         const headerDiv = contentEl.createDiv({ cls: 'i18n-plus-header' });
-        headerDiv.createEl('h2', { text: 'Dictionary manager' });
+        headerDiv.createEl('h2', { text: 'I18n+ Dictionary Manager' });
 
         // Refresh Button
         new Setting(headerDiv)
             .addButton(btn => btn
-                .setButtonText('Refresh')
+                .setIcon('refresh-cw')
                 .setTooltip('Reload dictionaries and refresh interface')
                 .onClick(() => {
                     void this.plugin.dictionaryStore.autoLoadDictionaries().then(count => {
@@ -52,7 +52,7 @@ export class DictionaryManagerModal extends Modal {
 
         // Intro
         contentEl.createEl('p', {
-            text: 'Manage translation dictionaries for registered plugins.',
+            text: 'Manage and customize translations for your Obsidian plugins.',
             cls: 'setting-item-description'
         });
 
@@ -61,15 +61,13 @@ export class DictionaryManagerModal extends Modal {
         const registeredPlugins = manager.getRegisteredPlugins();
         const installedDicts = await this.store.listAllDictionaries();
 
-        console.debug('[i18n-plus UI] Registered plugins:', registeredPlugins);
-        console.debug('[i18n-plus UI] Installed dicts:', installedDicts);
-
-        // Registered Plugins Section - Use scrollable container
-        contentEl.createEl('h3', { text: `Registered Plugins (${registeredPlugins.length})` });
+        // Section: Registered Plugins
+        const pluginHeader = contentEl.createDiv({ cls: 'i18n-plus-section-header' });
+        pluginHeader.createEl('h3', { text: `Registered Plugins (${registeredPlugins.length})` });
 
         if (registeredPlugins.length === 0) {
             contentEl.createEl('p', {
-                text: 'No plugins registered to i18n-plus.',
+                text: 'No plugins currently using i18n-plus framework.',
                 cls: 'setting-item-description'
             });
         } else {
@@ -79,20 +77,25 @@ export class DictionaryManagerModal extends Modal {
             }
         }
 
-        // Orphan Dictionaries
+        // Section: Orphan Dictionaries
         const orphanDicts = installedDicts.filter(d => !registeredPlugins.includes(d.pluginId));
         if (orphanDicts.length > 0) {
-            contentEl.createEl('h3', { text: `⚠️ Orphan Dictionaries (${orphanDicts.length})` });
-            contentEl.createEl('p', {
-                text: 'Metrics for target plugin not registered',
-                cls: 'setting-item-description'
-            });
-            this.renderOrphanDictsList(contentEl, orphanDicts);
+            this.renderOrphanSection(contentEl, orphanDicts);
         }
     }
 
     /**
-     * Render single plugin section
+     * Render a small badge element
+     */
+    private renderBadge(container: HTMLElement, text: string, type: 'builtin' | 'external' | 'version'): void {
+        container.createSpan({
+            text: text.toUpperCase(),
+            cls: `i18n-plus-badge i18n-plus-badge-${type}`
+        });
+    }
+
+    /**
+     * Render single plugin section with collapsible functionality
      */
     private renderPluginSection(
         container: HTMLElement,
@@ -108,130 +111,173 @@ export class DictionaryManagerModal extends Modal {
         const currentLocale = translator.getLocale();
         const pluginDicts = installedDicts.filter(d => d.pluginId === pluginId);
 
-        const section = container.createDiv({ cls: 'i18n-plus-plugin-section' });
+        const section = container.createDiv({ cls: 'i18n-plus-plugin-section is-collapsed' });
 
-        // Plugin Card
-        const pluginSetting = new Setting(section)
-            .setName(pluginId)
-            .setDesc(this.buildLocaleDescription(builtinLocales, externalLocales));
+        // --- Card Header ---
+        const cardHeader = section.createDiv({ cls: 'i18n-plus-card-header' });
 
-        // Locale Switcher Dropdown
-        pluginSetting.addDropdown(dropdown => {
-            // Add all available locales
-            const allLocales = [...new Set([...builtinLocales, ...externalLocales])];
-            for (const locale of allLocales) {
-                const localeInfo = OBSIDIAN_LOCALES.find(l => l.code === locale);
-                const label = localeInfo ? `${localeInfo.nativeName} (${locale})` : locale;
-                const isExternal = externalLocales.includes(locale) && !builtinLocales.includes(locale);
-                dropdown.addOption(locale, isExternal ? `📥 ${label}` : label);
-            }
-            dropdown.setValue(currentLocale);
-            dropdown.onChange((value) => {
-                translator.setLocale(value);
-                manager.setGlobalLocale(value);
-                new Notice(`Switched ${pluginId} locale to: ${value}`);
-            });
+        const titleArea = cardHeader.createDiv({ cls: 'i18n-plus-card-title' });
+
+        // Collapse Icon (Lucide Chevron)
+        const iconSpan = titleArea.createSpan({ cls: 'i18n-plus-collapse-icon' });
+        iconSpan.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down"><path d="m6 9 6 6 6-6"/></svg>';
+
+        const info = titleArea.createDiv({ cls: 'setting-item-info' });
+        info.createDiv({ cls: 'setting-item-name', text: pluginId });
+        info.createDiv({
+            cls: 'setting-item-description',
+            text: `${builtinLocales.length} builtin | ${pluginDicts.length} imported locales`
         });
 
+        const controls = cardHeader.createDiv({ cls: 'setting-item-control' });
+        // Prevent header click when interacting with controls
+        controls.onClickEvent((e) => e.stopPropagation());
+
+        // Locale Switcher
+        const dropdown = controls.createEl('select', { cls: 'dropdown' });
+        const allLocales = [...new Set([...builtinLocales, ...externalLocales])];
+        for (const locale of allLocales) {
+            const localeInfo = OBSIDIAN_LOCALES.find(l => l.code === locale);
+            const label = localeInfo ? `${localeInfo.nativeName} (${locale})` : locale;
+            const isExternal = externalLocales.includes(locale) && !builtinLocales.includes(locale);
+
+            const option = dropdown.createEl('option', {
+                value: locale,
+                text: (isExternal ? '📥 ' : '📦 ') + label
+            });
+            if (locale === currentLocale) option.selected = true;
+        }
+
+        dropdown.onchange = () => {
+            translator.setLocale(dropdown.value);
+            manager.setGlobalLocale(dropdown.value);
+            new Notice(`Switched ${pluginId} to ${dropdown.value}`);
+        };
+
         // Import Button
-        pluginSetting.addButton(btn => btn
-            .setButtonText('📥')
-            .setTooltip('Import dictionary')
-            .onClick(() => this.importDictionaryForPlugin(pluginId))
-        );
+        const importBtn = controls.createEl('button', { cls: 'clickable-icon' });
+        importBtn.setAttribute('aria-label', 'Import Dictionary');
+        importBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-up"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M12 12v6"/><path d="m15 15-3-3-3 3"/></svg>';
+        importBtn.onclick = () => this.importDictionaryForPlugin(pluginId);
 
-        // Builtin Dictionary Management
-        if (builtinLocales.length > 0) {
-            const builtinDiv = section.createDiv({ cls: 'i18n-plus-dict-list' });
+        // --- Card Body ---
+        const cardBody = section.createDiv({ cls: 'i18n-plus-card-body' });
+        const dictGrid = cardBody.createDiv({ cls: 'i18n-plus-dict-list' });
 
-            for (const locale of builtinLocales) {
-                const item = builtinDiv.createDiv({ cls: 'i18n-plus-dict-item' });
-                new Setting(item)
-                    .setName(`📦 ${locale} (Builtin)`)
-                    .setDesc('Source')
-                    .addButton(btn => btn
-                        .setIcon('download')
-                        .setTooltip('Export (as translation template)')
-                        .onClick(() => this.exportBuiltinDictionary(pluginId, locale))
-                    );
-            }
+        // Click to toggle
+        cardHeader.onclick = () => {
+            section.classList.toggle('is-collapsed');
+        };
+
+        // Render Builtin Dictionaries as compact items
+        for (const locale of builtinLocales) {
+            this.renderBuiltinCompactItem(dictGrid, pluginId, locale);
         }
 
-        // External Dictionary Management (if any)
-        if (pluginDicts.length > 0) {
-            const dictDiv = section.createDiv({ cls: 'i18n-plus-dict-list' });
-            dictDiv.createEl('small', {
-                text: `Imported ${pluginDicts.length} dictionaries`,
-                cls: 'setting-item-description'
-            });
-            for (const dict of pluginDicts) {
-                this.renderDictItem(dictDiv, dict);
-            }
-        } else {
-            section.createEl('small', {
-                text: '0 imported dictionaries',
-                cls: 'setting-item-description i18n-plus-no-dict'
+        // Render External Dictionaries
+        for (const dict of pluginDicts) {
+            this.renderDictItem(dictGrid, dict);
+        }
+
+        if (builtinLocales.length === 0 && pluginDicts.length === 0) {
+            cardBody.createEl('div', {
+                text: 'No dictionaries available for this plugin.',
+                cls: 'i18n-plus-no-dict'
             });
         }
     }
 
     /**
-     * Build locale description string
+     * Render a small badge element
      */
-    private buildLocaleDescription(builtinLocales: string[], externalLocales: string[]): string {
-        const parts: string[] = [];
-        if (builtinLocales.length > 0) {
-            parts.push(`Builtin: ${builtinLocales.join(', ')}`);
-        }
-        if (externalLocales.length > 0) {
-            const uniqueExternal = externalLocales.filter(l => !builtinLocales.includes(l));
-            if (uniqueExternal.length > 0) {
-                parts.push(`Imported: ${uniqueExternal.join(', ')}`);
-            }
-        }
-        return parts.join(' | ');
+    private renderBuiltinCompactItem(container: HTMLElement, pluginId: string, locale: string): void {
+        const item = container.createDiv({ cls: 'i18n-plus-dict-item' });
+        const inner = item.createDiv({ cls: 'setting-item' });
+
+        const info = inner.createDiv({ cls: 'setting-item-info' });
+        const name = info.createDiv({ cls: 'setting-item-name', text: locale });
+        this.renderBadge(name, 'Plugin', 'builtin');
+
+        const controls = inner.createDiv({ cls: 'setting-item-control' });
+        const exportBtn = controls.createEl('button', { cls: 'clickable-icon' });
+        exportBtn.setAttribute('aria-label', 'Export Template');
+        exportBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-download"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+        exportBtn.onclick = () => this.exportBuiltinDictionary(pluginId, locale);
     }
 
     /**
-     * Render single dictionary item
+     * Render single external dictionary item
      */
     private renderDictItem(container: HTMLElement, dict: DictionaryFileInfo) {
         const item = container.createDiv({ cls: 'i18n-plus-dict-item' });
+        const inner = item.createDiv({ cls: 'setting-item' });
 
-        new Setting(item)
-            .setName(`📥 ${dict.locale}`)
-            .setDesc(`v${dict.dictVersion || '?'}`)
-            .addButton(btn => btn
-                .setIcon('download')
-                .setTooltip('Export')
-                .onClick(() => this.exportDictionary(dict))
-            )
-            .addButton(btn => btn
-                .setIcon('trash')
-                .setTooltip('Unload')
-                .setWarning()
-                .onClick(() => this.unloadDictionary(dict))
-            );
+        const info = inner.createDiv({ cls: 'setting-item-info' });
+        const name = info.createDiv({ cls: 'setting-item-name', text: dict.locale });
+        this.renderBadge(name, 'Custom', 'external');
+        if (dict.dictVersion) {
+            this.renderBadge(info.createDiv({ cls: 'setting-item-description' }), `v${dict.dictVersion}`, 'version');
+        }
+
+        const controls = inner.createDiv({ cls: 'setting-item-control' });
+
+        // Export
+        const exportBtn = controls.createEl('button', { cls: 'clickable-icon' });
+        exportBtn.setAttribute('aria-label', 'Export');
+        exportBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-download"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+        exportBtn.onclick = () => this.exportDictionary(dict);
+
+        // Delete
+        const deleteBtn = controls.createEl('button', { cls: 'clickable-icon mod-warning' });
+        deleteBtn.setAttribute('aria-label', 'Remove');
+        deleteBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trash-2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>';
+        deleteBtn.onclick = () => this.unloadDictionary(dict);
     }
 
     /**
-     * Render orphan dictionary list
+     * Render Orphan Dictionaries section with collapsible functionality
      */
-    private renderOrphanDictsList(container: HTMLElement, dicts: DictionaryFileInfo[]) {
-        const list = container.createDiv({ cls: 'i18n-plus-orphan-list' });
+    private renderOrphanSection(container: HTMLElement, dicts: DictionaryFileInfo[]): void {
+        const section = container.createDiv({ cls: 'i18n-plus-plugin-section is-collapsed' });
+
+        // --- Header ---
+        const header = section.createDiv({ cls: 'i18n-plus-card-header' });
+        header.style.borderLeft = '4px solid var(--color-red)';
+
+        const titleArea = header.createDiv({ cls: 'i18n-plus-card-title' });
+        const iconSpan = titleArea.createSpan({ cls: 'i18n-plus-collapse-icon' });
+        iconSpan.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down"><path d="m6 9 6 6 6-6"/></svg>';
+
+        const info = titleArea.createDiv({ cls: 'setting-item-info' });
+        info.createDiv({ cls: 'setting-item-name', text: `⚠️ Orphan Dictionaries (${dicts.length})` });
+        info.createDiv({
+            cls: 'setting-item-description',
+            text: 'Dictionaries remaining for uninstalled or disabled plugins.'
+        });
+
+        header.onclick = () => {
+            section.classList.toggle('is-collapsed');
+        };
+
+        // --- Body ---
+        const body = section.createDiv({ cls: 'i18n-plus-card-body' });
+        const list = body.createDiv({ cls: 'i18n-plus-orphan-list' });
+
         for (const dict of dicts) {
-            new Setting(list)
+            const item = new Setting(list)
                 .setName(`${dict.pluginId} / ${dict.locale}`)
-                .addButton(btn => btn
-                    .setIcon('trash')
-                    .setWarning()
-                    .onClick(() => {
-                        void this.store.deleteDictionary(dict.pluginId, dict.locale).then(() => {
-                            new Notice(`Deleted`);
-                            void this.onOpen();
-                        });
-                    })
-                );
+                .setDesc(dict.dictVersion ? `v${dict.dictVersion}` : '');
+
+            item.addButton(btn => btn
+                .setIcon('trash-2')
+                .setWarning()
+                .onClick(() => {
+                    void this.store.deleteDictionary(dict.pluginId, dict.locale).then(() => {
+                        new Notice(`Deleted Orphan Dictionary: ${dict.pluginId}-${dict.locale}`);
+                        void this.onOpen();
+                    });
+                })
+            );
         }
     }
 
@@ -250,10 +296,10 @@ export class DictionaryManagerModal extends Modal {
             const result = await this.store.importFromFile(file, pluginId);
 
             if (result.valid) {
-                new Notice('Import successful');
+                new Notice(`Imported dictionary for ${pluginId}`);
                 void this.onOpen();
             } else {
-                const errorMsg = result.errors?.map(e => e.message).join(', ') || 'Unknown error';
+                const errorMsg = result.errors?.map(e => e.message).join(', ') || 'Unknown validation error';
                 new Notice(`❌ Import Failed: ${errorMsg}`);
             }
         };
@@ -267,7 +313,7 @@ export class DictionaryManagerModal extends Modal {
     private async exportDictionary(dict: DictionaryFileInfo) {
         const blob = await this.store.exportToBlob(dict.pluginId, dict.locale);
         if (!blob) {
-            new Notice('Export failed');
+            new Notice('Export failed: Could not read file');
             return;
         }
 
@@ -278,14 +324,13 @@ export class DictionaryManagerModal extends Modal {
         a.click();
         URL.revokeObjectURL(url);
 
-        new Notice(`Exported`);
+        new Notice(`Exported ${dict.locale} for ${dict.pluginId}`);
     }
 
     /**
      * Export builtin dictionary (from memory)
      */
     private exportBuiltinDictionary(pluginId: string, locale: string): void {
-        // Get translator via global API
         const i18nPlusApi = window.i18nPlus;
         const translator = i18nPlusApi?.getTranslator(pluginId);
         if (!translator) {
@@ -295,11 +340,10 @@ export class DictionaryManagerModal extends Modal {
 
         const dict = translator.getDictionary(locale) || {};
 
-        // Construct standard dictionary format (flat structure with $meta)
         const exportData = {
             $meta: {
                 pluginId: pluginId,
-                pluginVersion: '0.0.0', // Placeholder as we can't get plugin version
+                pluginVersion: '0.0.0',
                 dictVersion: '1.0.0',
                 locale: locale,
                 author: 'I18n Plus Export',
@@ -317,7 +361,7 @@ export class DictionaryManagerModal extends Modal {
         a.download = `${pluginId}.${locale}.json`;
         a.click();
         URL.revokeObjectURL(url);
-        new Notice(`Exported builtin dictionary: ${locale}`);
+        new Notice(`Exported builtin template: ${locale}`);
     }
 
     /**
@@ -327,7 +371,7 @@ export class DictionaryManagerModal extends Modal {
         const manager = getI18nPlusManager();
         manager.unloadDictionary(dict.pluginId, dict.locale);
         await this.store.deleteDictionary(dict.pluginId, dict.locale);
-        new Notice(`Unloaded`);
+        new Notice(`Removed ${dict.locale} dictionary`);
         void this.onOpen();
     }
 

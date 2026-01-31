@@ -1,5 +1,11 @@
 /* I18n Plus Styles */
 
+/* Modal width optimization */
+.modal:has(.i18n-plus-manager) {
+    width: 90vw;
+    max-width: 1000px;
+}
+
 .i18n-plus-manager {
     padding: 10px;
 }
@@ -8,31 +14,87 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-}
-
-.i18n-plus-header h2 {
-    margin: 0;
+    border-bottom: 2px solid var(--background-modifier-border);
+    padding-bottom: 10px;
+    margin-bottom: 15px;
 }
 
 .i18n-plus-manager h3 {
-    margin-top: 20px;
-    margin-bottom: 10px;
-    padding-bottom: 5px;
-    border-bottom: 1px solid var(--background-modifier-border);
-}
-
-/* 可滚动的插件列表 */
-.i18n-plus-plugin-list {
-    max-height: 400px;
-    overflow-y: auto;
-    padding-right: 5px;
-}
-
-.i18n-plus-plugin-section {
+    margin-top: 25px;
     margin-bottom: 15px;
-    padding: 12px;
-    background: var(--background-secondary);
-    border-radius: 8px;
+    font-size: 1.1em;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+/* Scrollable Plugin List */
+.i18n-plus-plugin-list {
+    max-height: 550px;
+    overflow-y: auto;
+    padding: 5px;
+}
+
+/* Plugin Card Styling - Enhanced for Collapsing */
+.i18n-plus-plugin-section {
+    margin-bottom: 20px;
+    padding: 0;
+    /* Changed to handle header/body separation */
+    background: var(--background-primary-alt);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.i18n-plus-plugin-section:hover {
+    border-color: var(--interactive-accent);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.i18n-plus-card-header {
+    padding: 16px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--background-secondary-alt);
+    user-select: none;
+}
+
+.i18n-plus-card-header:hover {
+    background: var(--background-modifier-hover);
+}
+
+.i18n-plus-card-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-grow: 1;
+}
+
+.i18n-plus-collapse-icon {
+    transition: transform 0.3s ease;
+    color: var(--text-muted);
+}
+
+.i18n-plus-plugin-section.is-collapsed .i18n-plus-collapse-icon {
+    transform: rotate(-90deg);
+}
+
+.i18n-plus-card-body {
+    padding: 16px;
+    border-top: 1px solid var(--background-modifier-border);
+    transition: max-height 0.3s ease, padding 0.3s ease, opacity 0.3s ease;
+}
+
+.i18n-plus-plugin-section.is-collapsed .i18n-plus-card-body {
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    opacity: 0;
+    border-top-color: transparent;
+    pointer-events: none;
 }
 
 .i18n-plus-plugin-section .setting-item {
@@ -40,38 +102,88 @@
     padding: 0;
 }
 
-.i18n-plus-no-dict {
-    display: block;
-    margin-top: 8px;
-    opacity: 0.6;
+.i18n-plus-plugin-section .setting-item-name {
+    font-size: 1.1em;
+    font-weight: bold;
 }
 
+/* Badge Styling */
+.i18n-plus-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.75em;
+    font-weight: 600;
+    margin-left: 8px;
+    text-transform: uppercase;
+}
+
+.i18n-plus-badge-builtin {
+    background-color: var(--color-blue-filter);
+    color: white;
+}
+
+.i18n-plus-badge-external {
+    background-color: var(--color-green-filter);
+    color: white;
+}
+
+.i18n-plus-badge-version {
+    background-color: var(--background-modifier-border);
+    color: var(--text-muted);
+}
+
+/* Dictionary List Grid-like Layout */
 .i18n-plus-dict-list {
-    margin-top: 10px;
-    padding-left: 10px;
-    border-left: 2px solid var(--background-modifier-border);
+    margin-top: 15px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 10px;
 }
 
 .i18n-plus-dict-item {
-    margin-bottom: 5px;
+    background: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    padding: 8px 12px;
 }
 
 .i18n-plus-dict-item .setting-item {
-    padding: 4px 0;
-    border-bottom: none;
+    padding: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+.i18n-plus-dict-item .setting-item-info {
+    flex-grow: 1;
 }
 
 .i18n-plus-dict-item .setting-item-name {
     font-size: 13px;
+    margin-bottom: 2px;
 }
 
 .i18n-plus-dict-item .setting-item-description {
     font-size: 11px;
+    margin: 0;
+}
+
+.i18n-plus-no-dict {
+    display: block;
+    margin-top: 12px;
+    font-style: italic;
+    opacity: 0.5;
 }
 
 .i18n-plus-orphan-list {
     max-height: 200px;
     overflow-y: auto;
+    border: 1px solid var(--background-modifier-error);
+    border-radius: 8px;
+    padding: 10px;
 }
 
 .i18n-plus-orphan-list .setting-item {
