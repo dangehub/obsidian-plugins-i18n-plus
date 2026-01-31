@@ -8,14 +8,20 @@
  * Dictionary Meta Information
  */
 export interface DictionaryMeta {
+    /** Target plugin ID */
+    pluginId?: string;
     /** Locale identifier (BCP 47), e.g., "zh-CN", "en" */
     locale: string;
     /** Dictionary version (translation iteration version) */
     dictVersion: string;
     /** Adapted plugin version range, e.g., ">=1.0.0" */
     pluginVersion?: string;
+    /** Primary author (single string for simple display) */
+    author?: string;
     /** List of authors */
     authors?: string[];
+    /** Description */
+    description?: string;
 }
 
 /**

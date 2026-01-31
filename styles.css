@@ -455,3 +455,30 @@
     opacity: 0.5;
     cursor: not-allowed;
 }
+
+/* Confirm Modal */
+.i18n-plus-confirm-modal {
+    text-align: center;
+    padding: 20px;
+}
+
+.i18n-plus-confirm-modal h2 {
+    margin-top: 0;
+    margin-bottom: 15px;
+}
+
+.i18n-plus-confirm-modal p {
+    color: var(--text-muted);
+    margin-bottom: 30px;
+}
+
+.i18n-plus-confirm-modal .modal-button-container {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.i18n-plus-confirm-modal .modal-button-container button {
+    min-width: 80px;
+}

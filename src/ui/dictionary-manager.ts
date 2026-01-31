@@ -9,7 +9,7 @@
  * - Unloading dictionaries
  */
 
-import { App, Modal, Setting, Notice, setIcon } from 'obsidian';
+import { App, Modal, Setting, Notice, setIcon, SuggestModal } from 'obsidian';
 import type I18nPlusPlugin from '../main';
 import { getI18nPlusManager } from '../framework/global-api';
 import { DictionaryStore, DictionaryFileInfo } from '../services/dictionary-store';
@@ -160,6 +160,12 @@ export class DictionaryManagerModal extends Modal {
         importBtn.setAttribute('aria-label', 'Import dictionary');
         setIcon(importBtn, 'file-up');
         importBtn.onclick = () => this.importDictionaryForPlugin(pluginId);
+
+        // Add Button
+        const addBtn = controls.createEl('button', { cls: 'clickable-icon' });
+        addBtn.setAttribute('aria-label', 'Add translation');
+        setIcon(addBtn, 'plus');
+        addBtn.onclick = () => this.createNewDictionary(pluginId);
 
         // --- Card Body ---
         const cardBody = section.createDiv({ cls: 'i18n-plus-card-body' });
@@ -378,16 +384,174 @@ export class DictionaryManagerModal extends Modal {
     /**
      * Unload dictionary
      */
-    private async unloadDictionary(dict: DictionaryFileInfo) {
+    private unloadDictionary(dict: DictionaryFileInfo) {
+        new ConfirmModal(this.app,
+            `Delete dictionary ${dict.pluginId}/${dict.locale}?`,
+            'This action cannot be undone.',
+            'Delete',
+            async () => {
+                const manager = getI18nPlusManager();
+                manager.unloadDictionary(dict.pluginId, dict.locale);
+                await this.store.deleteDictionary(dict.pluginId, dict.locale);
+                new Notice(`Removed ${dict.locale} dictionary`);
+                void this.onOpen();
+            }
+        ).open();
+    }
+
+    /**
+     * Create new dictionary for plugin
+     */
+    private createNewDictionary(pluginId: string): void {
         const manager = getI18nPlusManager();
-        manager.unloadDictionary(dict.pluginId, dict.locale);
-        await this.store.deleteDictionary(dict.pluginId, dict.locale);
-        new Notice(`Removed ${dict.locale} dictionary`);
-        void this.onOpen();
+        const translator = manager.getTranslator(pluginId);
+        if (!translator) return;
+
+        // Get existing locales to exclude
+        const existingLocales = new Set([...translator.getBuiltinLocales(), ...translator.getExternalLocales()]);
+
+        // Filter options
+        const options = OBSIDIAN_LOCALES.filter(l => !existingLocales.has(l.code));
+
+        new LocaleSuggestModal(this.app, options, async (selectedLocale) => {
+            try {
+                // 1. Prepare new dictionary from base content
+                const baseLocale = translator.baseLocale;
+                const baseDict = translator.getDictionary(baseLocale);
+
+                if (!baseDict) {
+                    new Notice(`Error: Base dictionary (${baseLocale}) not found`);
+                    return;
+                }
+
+                // Try to get plugin version
+                // @ts-ignore - accessing internal API
+                const pluginManifest = (this.app as any).plugins?.manifests?.[pluginId];
+                const pluginVersion = pluginManifest?.version || '0.0.0';
+
+                const newDict: any = {
+                    $meta: {
+                        pluginId: pluginId,
+                        pluginVersion: pluginVersion,
+                        dictVersion: '1.0.0',
+                        locale: selectedLocale.code,
+                        author: 'User'
+                    }
+                };
+
+                // Copy keys with empty values
+                for (const key of Object.keys(baseDict)) {
+                    if (key !== '$meta') {
+                        newDict[key] = "";
+                    }
+                }
+
+                // 2. Create file
+                await this.store.createDictionary(pluginId, selectedLocale.code, newDict);
+
+                // 3. Load into manager
+                manager.loadDictionary(pluginId, selectedLocale.code, newDict);
+
+                // 4. Update UI
+                new Notice(`Created dictionary: ${selectedLocale.code}`);
+
+                // Refresh Manager UI
+                await this.onOpen();
+
+                // 5. Open Editor immediately
+                // Find the section and expand it if needed? (Manager UI rebuilds, so might need to wait or rely on user)
+                // Actually, let's just open the editor. The Manager background will refresh when we come back.
+                new DictionaryEditorModal(this.app, this.plugin, pluginId, selectedLocale.code, false).open();
+
+            } catch (error) {
+                console.error('[i18n-plus] Failed to create dictionary:', error);
+                new Notice(`Failed to create dictionary: ${error instanceof Error ? error.message : String(error)}`);
+            }
+        }).open();
     }
 
     onClose() {
         const { contentEl } = this;
         contentEl.empty();
+    }
+}
+
+interface LocaleOption {
+    code: string;
+    name: string;
+    nativeName: string;
+}
+
+/**
+ * Modal to select a locale
+ */
+class LocaleSuggestModal extends SuggestModal<LocaleOption> {
+    private options: LocaleOption[];
+    private onSelect: (locale: LocaleOption) => void;
+
+    constructor(app: App, options: LocaleOption[], onSelect: (locale: LocaleOption) => void) {
+        super(app);
+        this.options = options;
+        this.onSelect = onSelect;
+        this.setPlaceholder('Select language...');
+    }
+
+    getSuggestions(query: string): LocaleOption[] {
+        const lowerQuery = query.toLowerCase();
+        return this.options.filter(opt =>
+            opt.code.toLowerCase().includes(lowerQuery) ||
+            opt.name.toLowerCase().includes(lowerQuery) ||
+            opt.nativeName.toLowerCase().includes(lowerQuery)
+        );
+    }
+
+    renderSuggestion(opt: LocaleOption, el: HTMLElement) {
+        el.createDiv({ text: `${opt.nativeName} (${opt.name})` });
+        el.createEl('small', { text: opt.code, cls: 'i18n-plus-locale-code' });
+    }
+
+    onChooseSuggestion(opt: LocaleOption, evt: MouseEvent | KeyboardEvent) {
+        this.onSelect(opt);
+    }
+}
+
+/**
+ * Simple Confirmation Modal
+ */
+class ConfirmModal extends Modal {
+    private title: string;
+    private message: string;
+    private ctaText: string;
+    private onConfirm: () => void;
+
+    constructor(app: App, title: string, message: string, ctaText: string, onConfirm: () => void) {
+        super(app);
+        this.title = title;
+        this.message = message;
+        this.ctaText = ctaText;
+        this.onConfirm = onConfirm;
+    }
+
+    onOpen() {
+        const { contentEl } = this;
+        contentEl.addClass('i18n-plus-confirm-modal');
+
+        contentEl.createEl('h2', { text: this.title });
+        contentEl.createEl('p', { text: this.message });
+
+        const div = contentEl.createDiv({ cls: 'modal-button-container' });
+
+        const btnCancel = div.createEl('button', { text: 'Cancel' });
+        btnCancel.onclick = () => this.close();
+
+        const btnConfirm = div.createEl('button', { text: this.ctaText, cls: 'mod-warning' });
+        btnConfirm.onclick = () => {
+            this.onConfirm();
+            this.close();
+        };
+    }
+
+    onClose() {
+        this.contentEl.empty();
     }
 }

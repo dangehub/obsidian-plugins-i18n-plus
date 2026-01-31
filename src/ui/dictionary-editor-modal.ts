@@ -12,7 +12,7 @@ import { App, Modal, Setting, setIcon, Notice } from 'obsidian';
 import type I18nPlusPlugin from '../main';
 import { DictionaryStore } from '../services/dictionary-store';
 import { getI18nPlusManager } from '../framework/global-api';
-import type { Dictionary } from '../framework/types';
+import type { Dictionary, DictionaryMeta } from '../framework/types';
 
 // ============================================================================
 // Data Models
@@ -40,6 +40,7 @@ interface EditorState {
     isReadOnly: boolean;
     hasUnsavedChanges: boolean;  // Track if any entry is edited
     originalDict?: Dictionary;   // Keep original to preserve $meta and other fields
+    showMissingOnly: boolean;    // Filter: Show only missing translations
 }
 
 // ============================================================================
@@ -103,6 +104,7 @@ export class DictionaryEditorModal extends Modal {
             searchQuery: '',
             isReadOnly: !isBuiltin ? false : true, // Builtin = read-only, External = editable
             hasUnsavedChanges: false,
+            showMissingOnly: false,
         };
     }
 
@@ -262,6 +264,28 @@ export class DictionaryEditorModal extends Modal {
             this.state.searchQuery = searchInput.value.toLowerCase();
             this.filterEntries();
             this.renderContent();
+            this.updateStats(stats);
+        });
+
+        // Filter: Show Missing
+        const filterContainer = toolbar.createDiv({ cls: 'i18n-plus-editor-filter' });
+        const cb = filterContainer.createEl('input', {
+            type: 'checkbox',
+            cls: 'i18n-plus-checkbox'
+        });
+        cb.id = 'i18n-plus-filter-missing';
+        cb.checked = this.state.showMissingOnly;
+
+        filterContainer.createEl('label', {
+            text: 'Missing only',
+            attr: { for: 'i18n-plus-filter-missing' }
+        });
+
+        cb.addEventListener('change', () => {
+            this.state.showMissingOnly = cb.checked;
+            this.filterEntries();
+            this.renderContent();
+            this.updateStats(stats);
         });
 
         // Stats
@@ -418,6 +442,45 @@ export class DictionaryEditorModal extends Modal {
             })
         );
 
+        // Metadata Button
+        if (!this.state.isReadOnly) {
+            setting.addButton(btn => btn
+                .setButtonText('Metadata')
+                .setTooltip('Edit dictionary metadata')
+                .onClick(() => {
+                    if (this.state.originalDict && this.state.originalDict.$meta) {
+                        new MetadataEditorModal(
+                            this.app,
+                            this.state.originalDict.$meta,
+                            (newMeta) => {
+                                if (this.state.originalDict && this.state.originalDict.$meta) {
+                                    this.state.originalDict.$meta = {
+                                        ...this.state.originalDict.$meta,
+                                        ...newMeta
+                                    } as DictionaryMeta;
+                                    this.state.hasUnsavedChanges = true; // Mark as dirty ensuring save picks it up
+                                    this.updateSaveButtonState();
+                                    new Notice('Metadata updated (pending save)');
+                                }
+                            }
+                        ).open();
+                    } else {
+                        // Initialize meta if missing?
+                        if (this.state.originalDict) {
+                            this.state.originalDict.$meta = {
+                                pluginId: this.state.pluginId,
+                                locale: this.state.locale,
+                                pluginVersion: '0.0.0',
+                                dictVersion: '1.0.0'
+                            };
+                            // Recursive call to open it now
+                            (btn as any).buttonEl.click();
+                        }
+                    }
+                })
+            );
+        }
+
         // Close button
         setting.addButton(btn => btn
             .setButtonText('Close')
@@ -436,16 +499,23 @@ export class DictionaryEditorModal extends Modal {
     // ========================================================================
 
     private filterEntries(): void {
-        if (!this.state.searchQuery) {
-            this.state.filteredEntries = [...this.state.entries];
-            return;
+        let entries = this.state.entries;
+
+        // 1. Filter by "Show Missing"
+        if (this.state.showMissingOnly) {
+            entries = entries.filter(e => !e.value || e.value.trim() === '');
         }
 
-        const query = this.state.searchQuery.toLowerCase();
-        this.state.filteredEntries = this.state.entries.filter(entry =>
-            entry.key.toLowerCase().includes(query) ||
-            entry.value.toLowerCase().includes(query)
-        );
+        // 2. Filter by Search
+        if (this.state.searchQuery) {
+            const query = this.state.searchQuery.toLowerCase();
+            entries = entries.filter(entry =>
+                entry.key.toLowerCase().includes(query) ||
+                entry.value.toLowerCase().includes(query)
+            );
+        }
+
+        this.state.filteredEntries = entries;
     }
 
     private async exportDictionary(): Promise<void> {
@@ -599,4 +669,87 @@ export class DictionaryEditorModal extends Modal {
 
     /** Override callback for entry edits */
     protected onEntryEdit?(key: string, newValue: string): void;
+}
+
+/**
+ * Modal to edit dictionary metadata
+ */
+class MetadataEditorModal extends Modal {
+    private meta: Partial<DictionaryMeta>;
+    private onSave: (meta: Partial<DictionaryMeta>) => void;
+
+    constructor(app: App, meta: Partial<DictionaryMeta>, onSave: (meta: Partial<DictionaryMeta>) => void) {
+        super(app);
+        // Clone meta to avoid direct mutation until save
+        this.meta = { ...meta };
+        this.onSave = onSave;
+    }
+
+    onOpen() {
+        const { contentEl } = this;
+        contentEl.addClass('i18n-plus-metadata-modal');
+
+        contentEl.createEl('h2', { text: 'Dictionary Metadata' });
+
+        // Read-only fields
+        new Setting(contentEl)
+            .setName('Plugin ID')
+            .setDesc('Target plugin identifier (Read-only)')
+            .addText(text => text.setValue(this.meta.pluginId || '').setDisabled(true));
+
+        new Setting(contentEl)
+            .setName('Locale')
+            .setDesc('Target language code (Read-only)')
+            .addText(text => text.setValue(this.meta.locale || '').setDisabled(true));
+
+        // Editable fields
+        new Setting(contentEl)
+            .setName('Dictionary Version')
+            .setDesc('Version of this translation')
+            .addText(text => text
+                .setValue(this.meta.dictVersion || '1.0.0')
+                .onChange(val => this.meta.dictVersion = val));
+
+        new Setting(contentEl)
+            .setName('Plugin Version')
+            .setDesc('Target plugin version compatibility')
+            .addText(text => text
+                .setValue(this.meta.pluginVersion || '')
+                .onChange(val => this.meta.pluginVersion = val));
+
+        new Setting(contentEl)
+            .setName('Author')
+            .setDesc('Translator name or credit')
+            .addText(text => text
+                .setValue(this.meta.author || '')
+                .onChange(val => this.meta.author = val));
+
+        new Setting(contentEl)
+            .setName('Description')
+            .setDesc('Optional notes or description')
+            .addTextArea(text => text
+                .setValue(this.meta.description || '')
+                .onChange(val => this.meta.description = val));
+
+        const div = contentEl.createDiv({
+            cls: 'modal-button-container',
+            attr: { style: 'margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px;' }
+        });
+
+        new Setting(div)
+            .addButton(btn => btn
+                .setButtonText('Cancel')
+                .onClick(() => this.close()))
+            .addButton(btn => btn
+                .setButtonText('Update Metadata')
+                .setCta()
+                .onClick(() => {
+                    this.onSave(this.meta);
+                    this.close();
+                }));
+    }
+
+    onClose() {
+        this.contentEl.empty();
+    }
 }

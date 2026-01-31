@@ -107,6 +107,19 @@ export class DictionaryStore {
     }
 
     /**
+     * Create new dictionary (fails if exists)
+     */
+    async createDictionary(pluginId: string, locale: string, dict: Dictionary): Promise<void> {
+        const filePath = this.getDictionaryFilePath(pluginId, locale);
+
+        if (await this.app.vault.adapter.exists(filePath)) {
+            throw new Error(`Dictionary already exists for locale: ${locale}`);
+        }
+
+        await this.saveDictionary(pluginId, locale, dict);
+    }
+
+    /**
      * Load dictionary from local file
      */
     async loadDictionary(pluginId: string, locale: string): Promise<Dictionary | null> {
