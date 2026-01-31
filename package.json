@@ -8,6 +8,7 @@
 		"preinstall": "node scripts/npm-proxy.mjs",
 		"dev": "node esbuild.config.mjs",
 		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs build",
+		"deploy": "npm run build && node scripts/deploy.mjs",
 		"lint": "node scripts/lint-wrapper.mjs",
 		"lint:fix": "node scripts/lint-wrapper.mjs --fix",
 		"version": "node version-bump.mjs && git add manifest.json versions.json",

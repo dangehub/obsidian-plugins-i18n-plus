@@ -110,6 +110,37 @@ This means:
 | `inject-i18n.cjs` | Auto-inject adapter into `main.ts` |
 | `generate-report.cjs` | Generate migration report |
 
+## 🔧 Development
+
+### Available Commands
+
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start development mode with hot reload |
+| `npm run build` | Build the plugin (output to project root) |
+| `npm run deploy` | Build and copy to Obsidian test vault |
+| `npm run lint` | Run ESLint checks |
+
+### Deploy to Test Vault
+
+The `deploy` command automatically copies build artifacts to your local Obsidian vault for testing.
+
+**Setup:**
+
+1. Create `deploy.config.local.json` in project root:
+   ```json
+   {
+       "targetDir": "C:\\path\\to\\your\\.obsidian\\plugins\\i18n-plus"
+   }
+   ```
+
+2. Run:
+   ```bash
+   npm run deploy
+   ```
+
+> **Note**: `deploy.config.local.json` is gitignored to keep your local paths private.
+
 ## 📁 Project Structure
 
 ```

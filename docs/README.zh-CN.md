@@ -110,7 +110,38 @@ node scripts/extract-keys.cjs your-plugin/src
 | `inject-i18n.cjs` | 自动注入适配器到 `main.ts` |
 | `generate-report.cjs` | 生成迁移报告 |
 
-## 📁 项目结构
+## � 开发
+
+### 可用命令
+
+| 命令 | 描述 |
+|------|------|
+| `npm run dev` | 启动开发模式（热重载） |
+| `npm run build` | 构建插件（输出到项目根目录） |
+| `npm run deploy` | 构建并复制到 Obsidian 测试库 |
+| `npm run lint` | 运行 ESLint 检查 |
+
+### 部署到测试库
+
+`deploy` 命令会自动将构建产物复制到你本地的 Obsidian 库中进行测试。
+
+**配置步骤：**
+
+1. 在项目根目录创建 `deploy.config.local.json`：
+   ```json
+   {
+       "targetDir": "C:\\你的路径\\.obsidian\\plugins\\i18n-plus"
+   }
+   ```
+
+2. 运行：
+   ```bash
+   npm run deploy
+   ```
+
+> **注意**：`deploy.config.local.json` 已加入 gitignore，你的本地路径不会被上传。
+
+## �📁 项目结构
 
 ```
 templates/

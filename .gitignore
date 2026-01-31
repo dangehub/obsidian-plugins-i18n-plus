@@ -30,3 +30,6 @@ scripts/sync-agents.sh
 
 
 参考
+
+# Local deploy config (contains personal paths)
+deploy.config.local.json
