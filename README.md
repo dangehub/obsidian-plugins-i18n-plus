@@ -5,19 +5,48 @@
 
 [中文文档](docs/README.zh-CN.md)
 
-A universal internationalization (i18n) framework for the Obsidian plugin ecosystem. Provides zero-dependency adapters, automated migration tools, and seamless multi-language support.
+**I18n Plus** is a powerful Obsidian internationalization (i18n) management plugin, and also a universal development framework for the plugin ecosystem.
+
+For **Users**, it is an intuitive translation management tool that lets you easily translate/correct plugin translations.
+For **Developers**, it provides zero-dependency i18n adapters and automated migration tools.
+
+> **Read the Whitepaper**: For a deep dive into the philosophy, architecture, and future roadmap of Obsidian's third-party internationalization, please read the [Whitepaper](docs/WHITEPAPER.en.md).
 
 ## ✨ Features
 
+### For Users
+- **Visual Management**: View and manage translation status of all plugins in a unified panel
+- **Hot Reload**: Switch plugin languages without restarting Obsidian, effective immediately
+- **Incremental Localization**: Modify only unsatisfactory translations via "Overlay" mode without affecting the original plugin
+- **Community Sharing**: Import/Export `.json` translation files for easy sharing
+- **Cloud Sync**: Download the latest community translation packages directly from the cloud
+
+### For Developers
 - **Zero Runtime Dependency**: Plugins work perfectly without I18n Plus installed
 - **Standalone + Mixed Mode**: Built-in languages work independently; external dictionaries can override/extend them
 - **Automated Migration**: Transform hardcoded strings to `t()` calls with one command
-- **Hot Reload**: Switch languages instantly without restarting plugins
-- **Community Translations**: Users can import third-party translations without code changes
+- **Type Safety**: TypeScript-based intelligent code completion
 
 ## 🚀 Quick Start
 
-> **For Plugin Developers**: See the full [Migration Guide](docs/I18N_MIGRATION_GUIDE.en.md) for detailed integration instructions.
+### For Users
+
+1.  **Install Plugin**: Search for and install `i18n-plus` in Obsidian Community Plugins.
+2.  **Open Manager**: Click the `🌐` icon in the left sidebar, or use the command `Open Dictionary Manager`.
+3.  **Switch Language**:
+    -   Find the target plugin in the list
+    -   Select `zh` or another language from the dropdown
+    -   The interface will update immediately (for plugins supporting hot reload)
+4.  **Correct Translation**:
+    -   Click the `👁️` (View Content) button next to the plugin
+    -   Modify the translation in the editor
+    -   Click `Save` to apply changes immediately
+
+---
+
+### For Plugin Developers
+
+> See the full [Migration Guide](docs/I18N_MIGRATION_GUIDE.en.md) for detailed integration instructions.
 
 ### For Plugin Developers
 

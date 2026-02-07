@@ -203,7 +203,7 @@ i18n-plus 一键下载/更新
 ### A. 相关链接
 
 - [i18n-plus 插件仓库](https://github.com/open-obsidian-i18n/obsidian-i18n-plus)  
-- [云端词典仓库（开发中）](https://github.com/open-obsidian-i18n/dictionaries)  
+- [云端词典仓库](https://github.com/open-obsidian-i18n/dictionaries)  
 - [社区讨论区](https://github.com/open-obsidian-i18n/community)  
 
 ### B. 词典元数据规范
