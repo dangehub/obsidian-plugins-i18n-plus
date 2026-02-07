@@ -29,6 +29,8 @@ export const baseDictionary = {
     // === Manager Modal ===
     "manager.title": "I18n+ Dictionary Manager",
     "manager.registered_plugins": "Registered Plugins ({count})",
+    "manager.themes_title": "Themes ({count})",
+    "manager.dictionaries_suffix": "dictionaries",
     "manager.refresh_tooltip": "Reload dictionaries and refresh interface",
     "manager.orphan_section_title": "⚠️ Orphan Dictionaries ({count})",
     "manager.orphan_section_desc": "Dictionaries remaining for uninstalled or disabled plugins.",
@@ -36,6 +38,16 @@ export const baseDictionary = {
     "manager.delete_confirm_title": "Delete Dictionary",
     "manager.delete_confirm_message": "Are you sure you want to delete the {locale} dictionary for {pluginId}?",
     "manager.delete_confirm_warning": "This cannot be undone.",
+    "manager.registered_plugins_tab": "Plugins",
+    "manager.themes_tab": "Themes",
+    "label.builtin": "BUILT-IN",
+    "label.external": "EXTERNAL",
+    "label.overlay": "OVERLAY",
+    "label.theme_builtin": "THEME BASE",
+
+    // === Manager Search ===
+    "manager.search_plugins_placeholder": "Search plugins...",
+    "manager.search_themes_placeholder": "Search themes...",
 
     // === Manager Actions ===
     "action.import_dictionary": "Import dictionary",
@@ -46,6 +58,8 @@ export const baseDictionary = {
     "action.remove": "Remove",
     "action.cancel": "Cancel",
     "action.delete": "Delete",
+    "action.update_available": "Update available: v{version}",
+    "action.download_locale": "Download {locale}",
 
     // === Editor Modal ===
     "editor.search_placeholder": "Search keys or values...",
@@ -54,6 +68,7 @@ export const baseDictionary = {
     "editor.export_json": "Export JSON",
     "editor.metadata": "Metadata",
     "editor.close": "Close",
+    "editor.title": "Dictionary Editor",
     "editor.table_key": "Key",
     "editor.table_value": "Value",
     "editor.table_source": "Source",
@@ -105,6 +120,8 @@ export const baseDictionary = {
     "notice.no_plugins": "No plugins registered to i18n-plus",
     "notice.registered_plugins": "Registered: {plugins}",
     "notice.loaded_dicts": "Loaded {count} dictionaries",
+    "notice.theme_generated": "Generated base dictionary for {theme}",
+    "notice.theme_updated": "Updated base dictionary for {theme}",
 
     // === Settings ===
     "settings.debug_mode": "Debug mode",

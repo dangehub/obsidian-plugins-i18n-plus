@@ -8,6 +8,7 @@ import { Notice, Plugin } from 'obsidian';
 import { initGlobalAPI, destroyGlobalAPI, getI18nPlusManager } from './framework';
 import { DEFAULT_SETTINGS, I18nPlusSettings, I18nPlusSettingTab } from './settings';
 import { DictionaryStore } from './services/dictionary-store';
+import { CloudManager } from './services/cloud-manager';
 import { DictionaryManagerView } from './ui/dictionary-manager';
 import { DictionaryEditorView } from './ui/dictionary-editor-modal';
 import { I18nFloatingWidget } from './ui/floating-widget';
@@ -16,6 +17,7 @@ import { initSelfI18n, t } from './lang';
 export default class I18nPlusPlugin extends Plugin {
 	settings: I18nPlusSettings;
 	dictionaryStore: DictionaryStore;
+	cloudManager: CloudManager;
 	floatingWidget: I18nFloatingWidget | null = null;
 
 	async onload() {
@@ -25,6 +27,9 @@ export default class I18nPlusPlugin extends Plugin {
 
 		// Initialize dictionary store (must be before initGlobalAPI as event listeners need it)
 		this.dictionaryStore = new DictionaryStore(this.app, this);
+
+		// Initialize Cloud Manager
+		this.cloudManager = new CloudManager();
 
 		// Initialize Floating Widget
 		this.floatingWidget = new I18nFloatingWidget(this.app, this);
@@ -124,6 +129,23 @@ export default class I18nPlusPlugin extends Plugin {
 			this.showDictionaryManager();
 		});
 
+
+
+		// Initialize Global Locale immediately
+		if (this.settings.currentLocale) {
+			manager.setGlobalLocale(this.settings.currentLocale);
+			if (this.settings.debugMode) {
+				console.debug(`[i18n-plus] Restored locale: ${this.settings.currentLocale}`);
+			}
+		} else {
+			// Auto-detect if no setting
+			const currentLang = window.moment?.locale() || 'en';
+			manager.setGlobalLocale(currentLang);
+			if (this.settings.debugMode) {
+				console.debug(`[i18n-plus] Auto-detected global locale: ${currentLang}`);
+			}
+		}
+
 		// Delayed auto-load of installed dictionaries (wait for other plugins to register)
 		setTimeout(() => {
 			void this.dictionaryStore.autoLoadDictionaries().then(count => {
@@ -131,13 +153,15 @@ export default class I18nPlusPlugin extends Plugin {
 					console.debug(`[i18n-plus] Auto-loaded ${count} dictionaries on startup`);
 				}
 
-				// Restore saved locale setting
-				if (this.settings.currentLocale) {
-					manager.setGlobalLocale(this.settings.currentLocale);
-					if (this.settings.debugMode) {
-						console.debug(`[i18n-plus] Restored locale: ${this.settings.currentLocale}`);
+				// Fetch cloud dictionary manifest
+				void this.cloudManager.fetchRemoteManifest();
+
+				// Auto-load theme dictionaries
+				void this.dictionaryStore.autoLoadThemeDictionaries().then(count => {
+					if (count > 0 && this.settings.debugMode) {
+						console.debug(`[i18n-plus] Auto-loaded ${count} theme dictionaries`);
 					}
-				}
+				});
 			});
 		}, 3000);
 
@@ -164,18 +188,31 @@ export default class I18nPlusPlugin extends Plugin {
 		);
 	}
 
-	showDictionaryEditor(pluginId: string, locale: string) {
+	public showDictionaryEditor(pluginId: string | null, locale: string, themeName?: string, isBuiltinOverride?: boolean): void {
 		if (!this.floatingWidget) return;
 
-		const manager = getI18nPlusManager();
-		const translator = manager.getTranslator(pluginId);
-		// Check both builtin and external locales. For pure external dicts, it's not builtin.
-		const isBuiltin = translator?.getBuiltinLocales().includes(locale) || false;
+		// If themeName is provided, we default to "external" (editable) unless overridden.
+		// If isBuiltinOverride is provided, use it.
 
-		const view = new DictionaryEditorView(this.app, this, pluginId, locale, isBuiltin);
+		const manager = getI18nPlusManager();
+		let isBuiltin = isBuiltinOverride;
+
+		if (isBuiltin === undefined) {
+			if (pluginId) {
+				const translator = manager.getTranslator(pluginId);
+				isBuiltin = translator?.getBuiltinLocales().includes(locale) || false;
+			} else {
+				// Themes default to false (editable) unless specified
+				isBuiltin = false;
+			}
+		}
+
+		// Pass themeName to constructor
+		const view = new DictionaryEditorView(this.app, this, pluginId || '', locale, isBuiltin, themeName);
+
 		this.floatingWidget.showView(
 			(container) => view.render(container),
-			`${pluginId} / ${locale}`
+			themeName ? `${themeName} / ${locale}` : `${pluginId} / ${locale}`
 		);
 	}
 

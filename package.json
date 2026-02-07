@@ -11,7 +11,7 @@
 		"deploy": "npm run build && node scripts/deploy.mjs",
 		"lint": "node scripts/lint-wrapper.mjs",
 		"lint:fix": "node scripts/lint-wrapper.mjs --fix",
-		"version": "node version-bump.mjs && git add manifest.json versions.json",
+		"version": "node scripts/update-version.mjs",
 		"upgrade": "node scripts/upgrade.mjs"
 	},
 	"author": "",

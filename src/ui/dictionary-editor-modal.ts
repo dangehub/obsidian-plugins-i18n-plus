@@ -14,6 +14,7 @@ import { DictionaryStore } from '../services/dictionary-store';
 import { getI18nPlusManager } from '../framework/global-api';
 import type { Dictionary, DictionaryMeta } from '../framework/types';
 import { t } from '../lang';
+import { MetadataEditorView } from './metadata-editor-view';
 
 // ============================================================================
 // Data Models DictionaryEntry & EditorState
@@ -32,6 +33,7 @@ export interface DictionaryEntry {
 }
 
 /** Editor state */
+// Editor State
 interface EditorState {
     pluginId: string;
     locale: string;
@@ -40,11 +42,12 @@ interface EditorState {
     filteredEntries: DictionaryEntry[];
     searchQuery: string;
     isReadOnly: boolean;
-    hasUnsavedChanges: boolean;  // Track if any entry is edited
-    originalDict?: Dictionary;   // Keep original to preserve $meta and other fields
-    baseDict?: Dictionary;       // Base locale dictionary for reference (e.g., English)
-    baseLocale?: string;         // Base locale identifier
-    showMissingOnly: boolean;    // Filter: Show only missing translations
+    hasUnsavedChanges: boolean;
+    originalDict?: Dictionary;
+    baseDict?: Dictionary;
+    baseLocale?: string;
+    showMissingOnly: boolean;
+    themeName?: string; // Add themeName support
 }
 
 // ============================================================================
@@ -78,25 +81,22 @@ function detectVariables(value: string): { hasVariables: boolean; variables: str
     };
 }
 
-// ============================================================================
-// Dictionary Editor View
-// ============================================================================
-
 export class DictionaryEditorView {
     private app: App;
     private plugin: I18nPlusPlugin;
     private store: DictionaryStore;
     private state: EditorState;
     private contentContainer: HTMLElement | null = null;
-    private saveButton: HTMLButtonElement | null = null;  // Reference for dynamic updates
-    private container: HTMLElement | null = null; // Reference to main container
+    private saveButton: HTMLButtonElement | null = null;
+    private container: HTMLElement | null = null;
 
     constructor(
         app: App,
         plugin: I18nPlusPlugin,
         pluginId: string,
         locale: string,
-        isBuiltin: boolean
+        isBuiltin: boolean,
+        themeName?: string
     ) {
         this.app = app;
         this.plugin = plugin;
@@ -105,6 +105,7 @@ export class DictionaryEditorView {
             pluginId,
             locale,
             isBuiltin,
+            themeName,
             entries: [],
             filteredEntries: [],
             searchQuery: '',
@@ -161,37 +162,50 @@ export class DictionaryEditorView {
         }
     }
 
-    // ========================================================================
-    // Data Loading (Identical logic)
-    // ========================================================================
+    // ... render methods ...
 
+    // Data Loading
     private async loadDictionary(): Promise<void> {
         let dict: Dictionary | null = null;
 
-        const manager = getI18nPlusManager();
-        const translator = manager.getTranslator(this.state.pluginId);
+        if (this.state.themeName) {
+            // Theme Dictionary Loading
+            // Themes don't have "builtin" concept in the same way, always load from file
+            dict = await this.store.loadThemeDictionary(this.state.themeName, this.state.locale);
 
-        // Load base dictionary for reference (used when translating)
-        if (translator) {
-            this.state.baseLocale = translator.baseLocale;
-            // Get base dictionary (the source language, usually English)
-            if (typeof translator.getBuiltinDictionary === 'function') {
-                this.state.baseDict = translator.getBuiltinDictionary(translator.baseLocale) as Dictionary ?? undefined;
-            } else {
-                this.state.baseDict = translator.getDictionary(translator.baseLocale) ?? undefined;
-            }
-        }
-
-        if (this.state.isBuiltin && translator) {
-            // Try getBuiltinDictionary first (new interface), fallback to getDictionary
-            if (typeof translator.getBuiltinDictionary === 'function') {
-                dict = translator.getBuiltinDictionary(this.state.locale) as Dictionary ?? null;
-            } else {
-                dict = translator.getDictionary(this.state.locale) ?? null;
+            // For themes, base dict is always English (en) from the same theme if available
+            // We try to load 'en' as base
+            if (this.state.locale !== 'en') {
+                const baseDict = await this.store.loadThemeDictionary(this.state.themeName, 'en');
+                if (baseDict) {
+                    this.state.baseDict = baseDict;
+                    this.state.baseLocale = 'en';
+                }
             }
         } else {
-            // Load from external dictionary store
-            dict = await this.store.loadDictionary(this.state.pluginId, this.state.locale);
+            // Plugin Dictionary Loading
+            const manager = getI18nPlusManager();
+            const translator = manager.getTranslator(this.state.pluginId);
+
+            // Load base dictionary for reference
+            if (translator) {
+                this.state.baseLocale = translator.baseLocale;
+                if (typeof translator.getBuiltinDictionary === 'function') {
+                    this.state.baseDict = translator.getBuiltinDictionary(translator.baseLocale) as Dictionary ?? undefined;
+                } else {
+                    this.state.baseDict = translator.getDictionary(translator.baseLocale) ?? undefined;
+                }
+            }
+
+            if (this.state.isBuiltin && translator) {
+                if (typeof translator.getBuiltinDictionary === 'function') {
+                    dict = translator.getBuiltinDictionary(this.state.locale) as Dictionary ?? null;
+                } else {
+                    dict = translator.getDictionary(this.state.locale) ?? null;
+                }
+            } else {
+                dict = await this.store.loadDictionary(this.state.pluginId, this.state.locale);
+            }
         }
 
         if (!dict) {
@@ -200,14 +214,10 @@ export class DictionaryEditorView {
             return;
         }
 
-        // Store original dict for preserving metadata
         this.state.originalDict = dict;
-
-        // Parse entries with variable detection
         this.state.entries = this.parseEntries(dict);
         this.state.filteredEntries = [...this.state.entries];
     }
-
 
     private parseEntries(dict: Dictionary): DictionaryEntry[] {
         const entries: DictionaryEntry[] = [];
@@ -241,15 +251,11 @@ export class DictionaryEditorView {
         return entries;
     }
 
-
-    // ========================================================================
-    // Rendering
-    // ========================================================================
+    // ... parseEntries ...
 
     private renderHeader(container: HTMLElement): void {
         const header = container.createDiv({ cls: 'i18n-plus-editor-header' });
 
-        // Back Button
         const backBtn = header.createDiv({ cls: 'clickable-icon i18n-plus-editor-back-btn' });
         setIcon(backBtn, 'arrow-left');
         setTooltip(backBtn, 'Back');
@@ -261,26 +267,24 @@ export class DictionaryEditorView {
             }
         };
 
-        // Title with plugin name and locale
         const titleContainer = header.createDiv({ cls: 'i18n-plus-editor-title' });
-        // const icon = titleContainer.createSpan({ cls: 'i18n-plus-editor-icon' });
-        // setIcon(icon, 'book-open');
+
+        const titleText = this.state.themeName
+            ? `${this.state.themeName} / ${this.state.locale}`
+            : `${this.state.pluginId} / ${this.state.locale}`;
 
         titleContainer.createSpan({
-            text: `${this.state.pluginId} / ${this.state.locale}`,
+            text: titleText,
             cls: 'i18n-plus-editor-title-text'
         });
 
-        // Badges
         const badges = header.createDiv({ cls: 'i18n-plus-editor-badges' });
 
-        // Type badge
         const typeBadge = badges.createSpan({
             cls: `i18n-plus-badge ${this.state.isBuiltin ? 'i18n-plus-badge-builtin' : 'i18n-plus-badge-custom'}`
         });
-        typeBadge.textContent = this.state.isBuiltin ? 'Builtin' : 'Custom';
+        typeBadge.textContent = this.state.isBuiltin ? 'Builtin' : (this.state.themeName ? 'Theme' : 'Custom');
 
-        // Read-only badge
         if (this.state.isReadOnly) {
             const readOnlyBadge = badges.createSpan({ cls: 'i18n-plus-badge i18n-plus-badge-readonly' });
             readOnlyBadge.textContent = 'Read-only';
@@ -387,8 +391,6 @@ export class DictionaryEditorView {
         }
     }
 
-
-
     private renderEntryRow(tbody: HTMLElement, entry: DictionaryEntry): void {
         // For editable mode: use row header layout
         if (!this.state.isReadOnly) {
@@ -482,8 +484,6 @@ export class DictionaryEditorView {
         }
     }
 
-
-
     private renderValueWithHighlight(container: HTMLElement, value: string, variables: string[]): void {
         // Create a regex that matches any of the variables
         const escapedVars = variables.map(v => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
@@ -543,8 +543,9 @@ export class DictionaryEditorView {
                 .setTooltip(t('editor.metadata'))
                 .onClick(() => {
                     if (this.state.originalDict && this.state.originalDict.$meta) {
-                        new MetadataEditorModal(
+                        const metaView = new MetadataEditorView(
                             this.app,
+                            this.plugin,
                             this.state.originalDict.$meta,
                             (newMeta) => {
                                 if (this.state.originalDict && this.state.originalDict.$meta) {
@@ -552,14 +553,30 @@ export class DictionaryEditorView {
                                         ...this.state.originalDict.$meta,
                                         ...newMeta
                                     } as DictionaryMeta;
-                                    this.state.hasUnsavedChanges = true; // Mark as dirty ensuring save picks it up
+                                    this.state.hasUnsavedChanges = true;
                                     this.updateSaveButtonState();
-                                    new Notice(t('notice.metadata_updated'));
                                 }
+                                // Return to editor view after save
+                                this.plugin.floatingWidget?.showView(
+                                    (container) => this.render(container),
+                                    t('editor.title')
+                                );
+                            },
+                            () => {
+                                // Cancel - return to editor view
+                                this.plugin.floatingWidget?.showView(
+                                    (container) => this.render(container),
+                                    t('editor.title')
+                                );
                             }
-                        ).open();
+                        );
+                        // Show metadata view in floating widget
+                        this.plugin.floatingWidget?.showView(
+                            (container) => metaView.render(container),
+                            t('metadata.title')
+                        );
                     } else {
-                        // Initialize meta if missing?
+                        // Initialize meta if missing
                         if (this.state.originalDict) {
                             this.state.originalDict.$meta = {
                                 pluginId: this.state.pluginId,
@@ -567,7 +584,7 @@ export class DictionaryEditorView {
                                 pluginVersion: '0.0.0',
                                 dictVersion: '1.0.0'
                             };
-                            // Recursive call to open it now
+                            // Trigger click again now that meta exists
                             (btn as any).buttonEl.click();
                         }
                     }
@@ -575,7 +592,7 @@ export class DictionaryEditorView {
             );
         }
 
-        // Close button (Changed to Back or Close Panel)
+        // Close button
         setting.addButton(btn => btn
             .setButtonText(t('editor.close'))
             .onClick(async () => {
@@ -587,10 +604,6 @@ export class DictionaryEditorView {
             })
         );
     }
-
-    // ========================================================================
-    // Actions
-    // ========================================================================
 
     private filterEntries(): void {
         let entries = this.state.entries;
@@ -622,9 +635,9 @@ export class DictionaryEditorView {
             }
             const json = JSON.stringify(dict, null, 2);
             const exportBlob = new Blob([json], { type: 'application/json' });
-            this.downloadBlob(exportBlob, `${this.state.pluginId}.${this.state.locale}.json`);
+            this.downloadBlob(exportBlob, `${this.state.pluginId}_${this.state.locale}.json`);
         } else {
-            this.downloadBlob(blob, `${this.state.pluginId}.${this.state.locale}.json`);
+            this.downloadBlob(blob, `${this.state.pluginId}_${this.state.locale}.json`);
         }
         new Notice(t('notice.editor_export_success', { locale: this.state.locale }));
     }
@@ -640,13 +653,6 @@ export class DictionaryEditorView {
         URL.revokeObjectURL(url);
     }
 
-    // ========================================================================
-    // Edit Handling
-    // ========================================================================
-
-    /**
-     * Handle entry edit: update value, validate variables, track changes
-     */
     private handleEntryEdit(entry: DictionaryEntry, newValue: string): void {
         entry.value = newValue;
 
@@ -667,9 +673,6 @@ export class DictionaryEditorView {
         this.updateSaveButtonState();
 
         // Update stats
-        // We can't query selector easily scoped to this view unless we stored the stats container
-        // But since re-rendering entire row is partial, we can't easily update toolbar stats without ref
-        // Let's just re-render stats if we can find it
         if (this.container) {
             const stats = this.container.querySelector('.i18n-plus-editor-stats');
             if (stats) this.updateStats(stats as HTMLElement);
@@ -681,18 +684,12 @@ export class DictionaryEditorView {
         }
     }
 
-    /**
-     * Update save button disabled state based on hasUnsavedChanges
-     */
     private updateSaveButtonState(): void {
         if (this.saveButton) {
             this.saveButton.disabled = !this.state.hasUnsavedChanges;
         }
     }
 
-    /**
-     * Validate that all expected variables are preserved in the edited value
-     */
     private validateVariables(expectedVars: string[], newValue: string): string | undefined {
         const { variables: actualVars } = detectVariables(newValue);
 
@@ -711,25 +708,22 @@ export class DictionaryEditorView {
         return undefined;
     }
 
-    /**
-     * Save edited entries back to dictionary file
-     */
+    // ... renderToolbar, updateStats, renderContent, renderEntryRow, renderValueWithHighlight, renderFooter ...
+
+    // Save Dictionary
     private async saveDictionary(): Promise<boolean> {
         if (!this.state.hasUnsavedChanges) {
             return true;
         }
 
-        // Check for validation errors
         const errors = this.state.entries.filter(e => e.validationError);
         if (errors.length > 0) {
             new Notice(t('notice.validation_errors', { count: errors.length }));
             return false;
         }
 
-        // Build dictionary from entries
         const dict: Dictionary = {};
 
-        // Preserve metadata
         if (this.state.originalDict && this.state.originalDict.$meta) {
             dict.$meta = { ...this.state.originalDict.$meta };
         }
@@ -739,13 +733,23 @@ export class DictionaryEditorView {
         }
 
         try {
-            await this.store.saveDictionary(this.state.pluginId, this.state.locale, dict);
+            if (this.state.themeName) {
+                // Save Theme Dictionary
+                await this.store.saveThemeDictionary(this.state.themeName, this.state.locale, dict);
 
-            // Hot reload: update memory in Global Manager
-            const manager = getI18nPlusManager();
-            manager.loadDictionary(this.state.pluginId, this.state.locale, dict);
+                // Hot reload for theme
+                const manager = getI18nPlusManager();
+                manager.loadThemeDictionary(this.state.themeName, this.state.locale, dict);
 
-            // Reset edited state
+            } else {
+                // Save Plugin Dictionary
+                await this.store.saveDictionary(this.state.pluginId, this.state.locale, dict);
+
+                // Hot reload for plugin
+                const manager = getI18nPlusManager();
+                manager.loadDictionary(this.state.pluginId, this.state.locale, dict);
+            }
+
             for (const entry of this.state.entries) {
                 entry.originalValue = entry.value;
                 entry.isEdited = false;

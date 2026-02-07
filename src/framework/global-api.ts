@@ -22,6 +22,13 @@ export class I18nPlusManager implements I18nPlusAPI {
     private readonly translators: Map<string, I18nTranslatorInterface> = new Map();
     private readonly eventListeners: Map<string, Set<EventCallback>> = new Map();
 
+    // Theme dictionaries: Map<themeName, Map<locale, Dictionary>>
+    private readonly themeDictionaries: Map<string, Map<string, Dictionary>> = new Map();
+    // Theme aliases: custom ID (e.g. 'minimal-style') -> folder name (e.g. 'Minimal')
+    private readonly themeAliases: Map<string, string> = new Map();
+    // Current global locale (for theme translation lookup)
+    private currentLocale: string = 'en';
+
     /**
      * Register a plugin's translator instance
      */
@@ -102,11 +109,18 @@ export class I18nPlusManager implements I18nPlusAPI {
     getTranslator(pluginId: string): I18nTranslatorInterface | undefined {
         return this.translators.get(pluginId);
     }
+    /**
+     * Get current global locale
+     */
+    getGlobalLocale(): string {
+        return this.currentLocale;
+    }
 
     /**
      * Set locale for all registered plugins
      */
     setGlobalLocale(locale: string): void {
+        this.currentLocale = locale;
         for (const translator of this.translators.values()) {
             translator.setLocale(locale);
         }
@@ -147,6 +161,101 @@ export class I18nPlusManager implements I18nPlusAPI {
                 }
             }
         }
+    }
+
+    // ========== Theme Dictionary API ==========
+
+    /**
+     * Load theme dictionary
+     */
+    loadThemeDictionary(themeName: string, locale: string, dict: Dictionary): void {
+        // 1. Determine canonical ID (folder name, usually passed as themeName)
+        const id = themeName; // Keep themeName as canonical ID for UI consistency
+
+        // 2. Register dictionary
+        if (!this.themeDictionaries.has(id)) {
+            this.themeDictionaries.set(id, new Map());
+        }
+        this.themeDictionaries.get(id)!.set(locale, dict);
+
+        // 3. Register alias from dictionary content (stored by ThemeExtractor)
+        // @ts-ignore - Dynamic property check
+        const aliasIdsJson = dict['@@ids'];
+        if (aliasIdsJson && typeof aliasIdsJson === 'string') {
+            try {
+                const aliases = JSON.parse(aliasIdsJson);
+                if (Array.isArray(aliases)) {
+                    for (const alias of aliases) {
+                        if (typeof alias === 'string' && alias !== id) {
+                            this.themeAliases.set(alias, id);
+                            console.debug(`[i18n-plus] Registered theme alias: ${alias} -> ${id}`);
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn('[i18n-plus] Failed to parse @@ids alias list', e);
+            }
+        }
+
+        // Backward compatibility for single @@id (if any)
+        // @ts-ignore
+        const aliasId = dict['@@id'];
+        if (aliasId && typeof aliasId === 'string' && aliasId !== id) {
+            this.themeAliases.set(aliasId, id);
+        }
+
+        console.debug(`[i18n-plus] Loaded theme dictionary: ${id}/${locale}`);
+        this.emit('theme-dictionary-loaded', id, locale);
+    }
+
+    /**
+     * Unload theme dictionary
+     */
+    unloadThemeDictionary(themeName: string, locale: string): void {
+        const themeLocales = this.themeDictionaries.get(themeName);
+        if (themeLocales) {
+            themeLocales.delete(locale);
+            if (themeLocales.size === 0) {
+                this.themeDictionaries.delete(themeName);
+            }
+            console.debug(`[i18n-plus] Unloaded theme dictionary: ${themeName}/${locale}`);
+        }
+    }
+
+    /**
+     * Get translation for theme/snippet settings (called by Style Settings)
+     */
+    getTranslation(themeName: string, key: string): string | undefined {
+        // Resolve alias (e.g. 'minimal-style' -> 'Minimal')
+        const resolvedName = this.themeAliases.get(themeName) || themeName;
+        const themeLocales = this.themeDictionaries.get(resolvedName);
+        if (!themeLocales) return undefined;
+
+        // Try current locale first
+        const dict = themeLocales.get(this.currentLocale);
+        if (dict && key in dict) {
+            const value = dict[key];
+            if (typeof value === 'string') return value;
+        }
+
+        // Fallback: try base locale (e.g., 'zh' for 'zh-CN')
+        const baseLang = this.currentLocale.split('-')[0] ?? this.currentLocale;
+        if (baseLang !== this.currentLocale) {
+            const baseDict = themeLocales.get(baseLang);
+            if (baseDict && key in baseDict) {
+                const value = baseDict[key];
+                if (typeof value === 'string') return value;
+            }
+        }
+
+        return undefined;
+    }
+
+    /**
+     * Get list of loaded theme names
+     */
+    getLoadedThemes(): string[] {
+        return Array.from(this.themeDictionaries.keys());
     }
 }
 

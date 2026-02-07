@@ -1,13 +1,3 @@
-/**
- * Deploy script: Copy build artifacts to Obsidian test vault
- * Usage: npm run deploy
- * 
- * Configuration: Create `deploy.config.local.json` in project root:
- * {
- *     "targetDir": "C:\\path\\to\\your\\.obsidian\\plugins\\i18n-plus"
- * }
- */
-
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -23,11 +13,7 @@ async function deploy() {
     // Load config
     if (!fs.existsSync(configPath)) {
         console.error('❌ Config file not found: deploy.config.local.json');
-        console.error('');
-        console.error('Please create it in the project root with:');
-        console.error('{');
-        console.error('    "targetDir": "C:\\\\path\\\\to\\\\your\\\\.obsidian\\\\plugins\\\\i18n-plus"');
-        console.error('}');
+        console.error('Please create one with {"targetDir": "path/to/vault/.obsidian/plugins/i18n-plus"}');
         process.exit(1);
     }
 
@@ -35,35 +21,38 @@ async function deploy() {
     const TARGET_DIR = config.targetDir;
 
     if (!TARGET_DIR) {
-        console.error('❌ "targetDir" not specified in deploy.config.local.json');
+        console.error('❌ targetDir not specified in config');
         process.exit(1);
     }
 
-    console.log('\n🚀 Deploying to Obsidian test vault...');
-    console.log(`   Target: ${TARGET_DIR}\n`);
+    console.log(`🚀 Deploying to: ${TARGET_DIR}`);
 
-    // Ensure target directory exists
+    // Create target directory if not exists
     if (!fs.existsSync(TARGET_DIR)) {
         fs.mkdirSync(TARGET_DIR, { recursive: true });
-        console.log('📁 Created target directory');
+        console.log('Created target directory');
     }
 
-    let copied = 0;
+    // Copy files
     for (const file of FILES_TO_COPY) {
-        const src = path.join(projectRoot, file);
-        const dest = path.join(TARGET_DIR, file);
+        const srcPath = path.join(projectRoot, file);
+        const destPath = path.join(TARGET_DIR, file);
 
-        if (fs.existsSync(src)) {
-            fs.copyFileSync(src, dest);
-            console.log(`   ✓ ${file}`);
-            copied++;
+        if (fs.existsSync(srcPath)) {
+            fs.copyFileSync(srcPath, destPath);
+            console.log(`✅ Copied: ${file}`);
         } else {
-            console.log(`   ⚠ ${file} not found, skipping`);
+            console.warn(`⚠️ Source file not found: ${file}`);
         }
     }
 
-    console.log(`\n✅ Deployed ${copied} files successfully!`);
-    console.log('💡 Reload the plugin in Obsidian to see changes.\n');
+    // Create versions file if not exists (needed for Obsidian to recognize plugin updates)
+    const versionsPath = path.join(TARGET_DIR, '.hotreload');
+    if (!fs.existsSync(versionsPath)) {
+        fs.writeFileSync(versionsPath, '');
+    }
+
+    console.log('✨ Deployment complete!');
 }
 
 deploy().catch(err => {

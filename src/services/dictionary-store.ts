@@ -11,6 +11,7 @@ import { App, normalizePath } from 'obsidian';
 import type { Dictionary, ValidationResult } from '../framework/types';
 import type I18nPlusPlugin from '../main';
 import { getI18nPlusManager } from '../framework/global-api';
+import { ThemeExtractor } from './theme-extractor';
 
 /** Dictionary File Info */
 export interface DictionaryFileInfo {
@@ -26,6 +27,17 @@ export interface DictionaryFileInfo {
 export interface DictionaryStoreConfig {
     /** Dictionary storage root path (relative to vault) */
     basePath: string;
+}
+
+/** Theme Dictionary File Info */
+export interface ThemeDictionaryFileInfo {
+    themeName: string;
+    id?: string;
+    locale: string;
+    fileName: string;
+    filePath: string;
+    dictVersion?: string;
+    sourceHash?: string;
 }
 
 
@@ -51,6 +63,20 @@ export class DictionaryStore {
     }
 
     /**
+     * Get plugins dictionary base path
+     */
+    get pluginsBasePath(): string {
+        return normalizePath(`${this.basePath}/plugins`);
+    }
+
+    /**
+     * Get themes dictionary base path
+     */
+    get themesBasePath(): string {
+        return normalizePath(`${this.basePath}/themes`);
+    }
+
+    /**
      * Ensure storage directory exists
      */
     async ensureDirectory(path: string): Promise<void> {
@@ -73,14 +99,44 @@ export class DictionaryStore {
      * Get plugin dictionary directory path
      */
     getPluginDictPath(pluginId: string): string {
-        return normalizePath(`${this.basePath}/${pluginId}`);
+        return normalizePath(`${this.pluginsBasePath}/${pluginId}`);
     }
 
     /**
-     * Get dictionary file path
+     * Get all installed themes (folder names)
+     */
+    async listInstalledThemes(): Promise<string[]> {
+        // @ts-ignore - configDir is available in newer API
+        const configDir = this.app.vault.configDir || '.obsidian';
+        const themeDir = normalizePath(`${configDir}/themes`);
+
+        if (!(await this.app.vault.adapter.exists(themeDir))) {
+            return [];
+        }
+
+        const result = await this.app.vault.adapter.list(themeDir);
+        return result.folders.map(p => p.split('/').pop() || '').filter(n => n);
+    }
+
+    /**
+     * Get theme dictionary directory path
+     */
+    getThemeDictPath(themeName: string): string {
+        return normalizePath(`${this.themesBasePath}/${themeName}`);
+    }
+
+    /**
+     * Get plugin dictionary file path
      */
     getDictionaryFilePath(pluginId: string, locale: string): string {
-        return normalizePath(`${this.basePath}/${pluginId}/${locale}.json`);
+        return normalizePath(`${this.pluginsBasePath}/${pluginId}/${locale}.json`);
+    }
+
+    /**
+     * Get theme dictionary file path
+     */
+    getThemeDictionaryFilePath(themeName: string, locale: string): string {
+        return normalizePath(`${this.themesBasePath}/${themeName}/${locale}.json`);
     }
 
     /**
@@ -92,7 +148,13 @@ export class DictionaryStore {
 
         // Ensure directory exists
         await this.ensureDirectory(this.basePath);
+        await this.ensureDirectory(this.pluginsBasePath);
         await this.ensureDirectory(dirPath);
+
+        // Auto-update dictVersion to timestamp if meta exists
+        if (dict.$meta) {
+            dict.$meta.dictVersion = Date.now().toString();
+        }
 
         // Write file (using adapter API to support overwrite)
         const content = JSON.stringify(dict, null, 2);
@@ -193,26 +255,24 @@ export class DictionaryStore {
     }
 
     /**
-     * List all installed dictionaries
+     * List all installed plugin dictionaries
      */
     async listAllDictionaries(): Promise<DictionaryFileInfo[]> {
         const result: DictionaryFileInfo[] = [];
 
         try {
-            if (!(await this.app.vault.adapter.exists(this.basePath))) {
+            if (!(await this.app.vault.adapter.exists(this.pluginsBasePath))) {
                 return result;
             }
 
-            const baseList = await this.app.vault.adapter.list(this.basePath);
+            const baseList = await this.app.vault.adapter.list(this.pluginsBasePath);
             if (this.plugin.settings.debugMode) {
-                console.debug(`[i18n-plus] Scanning base path: ${this.basePath}`, baseList);
+                console.debug(`[i18n-plus] Scanning plugins path: ${this.pluginsBasePath}`, baseList);
             }
 
             // Iterate through plugin directories
             for (const pluginFolderPath of baseList.folders) {
                 // pluginFolderPath is full path, we need to extract basename for pluginId
-                // But normalizePath logic suggests paths are what we expect. 
-                // Let's safe extract pluginId
                 const pluginId = pluginFolderPath.split('/').pop() || '';
                 if (!pluginId) continue;
 
@@ -346,5 +406,284 @@ export class DictionaryStore {
         }
 
         return loadedCount;
+    }
+
+    // ========== Theme Dictionary Methods ==========
+
+    /**
+     * Theme dictionary file info
+     */
+    async listAllThemeDictionaries(): Promise<ThemeDictionaryFileInfo[]> {
+        const result: ThemeDictionaryFileInfo[] = [];
+
+        try {
+            if (!(await this.app.vault.adapter.exists(this.themesBasePath))) {
+                return result;
+            }
+
+            const baseList = await this.app.vault.adapter.list(this.themesBasePath);
+            if (this.plugin.settings.debugMode) {
+                console.debug(`[i18n-plus] Scanning themes path: ${this.themesBasePath}`, baseList);
+            }
+
+            // Iterate through theme directories
+            for (const themeFolderPath of baseList.folders) {
+                const themeName = themeFolderPath.split('/').pop() || '';
+                if (!themeName) continue;
+
+                const themeList = await this.app.vault.adapter.list(themeFolderPath);
+
+                // Iterate through dictionary files
+                for (const filePath of themeList.files) {
+                    if (!filePath.endsWith('.json')) continue;
+
+                    const fileName = filePath.split('/').pop() || '';
+                    if (!fileName) continue;
+
+                    const locale = fileName.replace('.json', '');
+
+                    // Try to read meta info
+                    let dictVersion: string | undefined;
+                    let dictId: string | undefined;
+                    let sourceHash: string | undefined;
+
+                    try {
+                        const content = await this.app.vault.adapter.read(filePath);
+                        const dict = JSON.parse(content) as Dictionary;
+                        dictVersion = dict.$meta?.dictVersion;
+                        dictId = dict.$meta?.id;
+                        sourceHash = dict.$meta?.sourceHash;
+                    } catch (e) {
+                        console.warn(`[i18n-plus] Skipped invalid theme dictionary file: ${filePath}`, e);
+                    }
+
+                    result.push({
+                        themeName,
+                        id: dictId,
+                        locale,
+                        fileName,
+                        filePath,
+                        dictVersion,
+                        sourceHash,
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('[i18n-plus] Failed to list theme dictionaries', error);
+        }
+
+        if (this.plugin.settings.debugMode) {
+            console.debug('[i18n-plus] Found theme dictionaries:', result);
+        }
+
+        return result;
+    }
+
+    /**
+     * Load theme dictionary from local file
+     */
+    async loadThemeDictionary(themeName: string, locale: string): Promise<Dictionary | null> {
+        const filePath = this.getThemeDictionaryFilePath(themeName, locale);
+
+        try {
+            if (!(await this.app.vault.adapter.exists(filePath))) {
+                return null;
+            }
+            const content = await this.app.vault.adapter.read(filePath);
+            return JSON.parse(content) as Dictionary;
+        } catch (error) {
+            console.error(`[i18n-plus] Failed to load theme dictionary: ${filePath}`, error);
+            return null;
+        }
+    }
+
+    /**
+     * Save theme dictionary to local file
+     */
+    async saveThemeDictionary(themeName: string, locale: string, dict: Dictionary): Promise<void> {
+        const dirPath = this.getThemeDictPath(themeName);
+        const filePath = this.getThemeDictionaryFilePath(themeName, locale);
+
+        // Ensure directory exists
+        await this.ensureDirectory(this.basePath);
+        await this.ensureDirectory(this.themesBasePath);
+        await this.ensureDirectory(dirPath);
+
+        // Auto-update dictVersion to timestamp if meta exists
+        if (dict.$meta) {
+            dict.$meta.dictVersion = Date.now().toString();
+        }
+
+        const content = JSON.stringify(dict, null, 2);
+
+        try {
+            await this.app.vault.adapter.write(filePath, content);
+            console.debug(`[i18n-plus] Saved theme dictionary: ${filePath}`);
+        } catch (error) {
+            console.error(`[i18n-plus] Failed to save theme dictionary: ${filePath}`, error);
+            throw error;
+        }
+    }
+
+    /**
+     * Automatically load all installed theme dictionaries at startup
+     */
+    async autoLoadThemeDictionaries(): Promise<number> {
+        const themeDicts = await this.listAllThemeDictionaries();
+        const manager = getI18nPlusManager();
+        let loadedCount = 0;
+
+        for (const info of themeDicts) {
+            const dict = await this.loadThemeDictionary(info.themeName, info.locale);
+            if (dict) {
+                manager.loadThemeDictionary(info.themeName, info.locale, dict);
+                loadedCount++;
+            }
+        }
+
+        if (loadedCount > 0) {
+            console.debug(`[i18n-plus] Auto-loaded ${loadedCount} theme dictionaries`);
+        }
+
+        return loadedCount;
+    }
+
+    async deleteThemeDictionary(themeName: string, locale: string): Promise<void> {
+        const filePath = this.getThemeDictionaryFilePath(themeName, locale);
+        try {
+            if (await this.app.vault.adapter.exists(filePath)) {
+                await this.app.vault.adapter.remove(filePath);
+                console.debug(`[i18n-plus] Deleted theme dictionary: ${filePath}`);
+            }
+        } catch (e) {
+            console.error('[i18n-plus] Failed to delete theme dictionary:', e);
+            throw e;
+        }
+    }
+
+    /**
+     * Generate base 'en' dictionary for a theme by scanning its CSS
+     */
+    async generateBaseThemeDictionary(themeName: string): Promise<ThemeDictionaryFileInfo | null> {
+        // 1. Locate theme file
+        // Note: configDir might be .obsidian or custom.
+        // @ts-ignore
+        const configDir = this.app.vault.configDir || '.obsidian';
+        const themeDir = normalizePath(`${configDir}/themes/${themeName}`);
+        const themePath = normalizePath(`${themeDir}/theme.css`);
+        const manifestPath = normalizePath(`${themeDir}/manifest.json`);
+
+        if (!await this.app.vault.adapter.exists(themePath)) {
+            console.warn(`Theme CSS not found: ${themePath}`);
+            return null;
+        }
+
+        // 2. Read content
+        const cssContent = await this.app.vault.adapter.read(themePath);
+
+        // 3. Extract strings
+        const { strings, hash } = ThemeExtractor.extractSettings(cssContent);
+        if (Object.keys(strings).length === 0) {
+            return null;
+        }
+
+        // 4. Read Manifest for Version
+        let themeVersion = '0.0.0';
+        try {
+            if (await this.app.vault.adapter.exists(manifestPath)) {
+                const manifestContent = await this.app.vault.adapter.read(manifestPath);
+                const manifest = JSON.parse(manifestContent);
+                if (manifest.version) {
+                    themeVersion = manifest.version;
+                }
+            }
+        } catch (e) {
+            console.warn(`[i18n-plus] Failed to read theme manifest for ${themeName}`, e);
+        }
+
+        // 5. Create base dictionary object
+        const baseDict: Dictionary = {
+            $meta: {
+                themeName: themeName,
+                themeVersion: themeVersion, // From manifest
+                dictVersion: Date.now().toString(), // Use timestamp
+                locale: 'en',
+                description: 'Automatically extracted from theme.css via Style Settings metadata',
+                sourceHash: hash
+            },
+            ...strings
+        };
+
+        // 6. Save to dictionaries/themes/{ThemeName}/en.json
+        const targetFolder = normalizePath(`${this.themesBasePath}/${themeName}`);
+        await this.ensureDirectory(targetFolder);
+
+        const targetFile = normalizePath(`${targetFolder}/en.json`);
+        await this.app.vault.adapter.write(targetFile, JSON.stringify(baseDict, null, 2));
+
+        // Reload themes
+        await this.autoLoadThemeDictionaries();
+
+        return {
+            themeName: themeName,
+            locale: 'en',
+            fileName: 'en.json',
+            filePath: targetFile,
+            dictVersion: baseDict.$meta?.dictVersion
+        };
+    }
+
+    /**
+     * Ensure the base theme dictionary is up to date with theme.css
+     */
+    async ensureThemeBaseDictionaryUpToDate(themeName: string): Promise<boolean> {
+        // 1. Get path
+        // @ts-ignore
+        const configDir = this.app.vault.configDir || '.obsidian';
+        const themePath = normalizePath(`${configDir}/themes/${themeName}/theme.css`);
+
+        if (!await this.app.vault.adapter.exists(themePath)) {
+            return false;
+        }
+
+        // 2. Read CSS and compute hash
+        const cssContent = await this.app.vault.adapter.read(themePath);
+        const currentHash = ThemeExtractor.computeHash(cssContent);
+
+        // 3. Check existing dictionary
+        const dictPath = normalizePath(`${this.themesBasePath}/${themeName}/en.json`);
+
+        // If en.json doesn't exist, we must generate it (if strings exist)
+        if (!await this.app.vault.adapter.exists(dictPath)) {
+            // Only generate if there are settings to extract
+            // This avoids creating empty folders for themes without settings
+            const { strings } = ThemeExtractor.extractSettings(cssContent);
+            if (Object.keys(strings).length > 0) {
+                console.log(`[i18n-plus] Base dictionary missing for ${themeName}, generating...`);
+                await this.generateBaseThemeDictionary(themeName);
+                return true;
+            }
+            return false;
+        }
+
+        // If it exists, check hash
+        try {
+            const content = await this.app.vault.adapter.read(dictPath);
+            const dict = JSON.parse(content) as Dictionary;
+
+            // Check matching hash
+            if (dict.$meta?.sourceHash === currentHash) {
+                // Up to date
+                return false;
+            }
+
+            console.log(`[i18n-plus] Theme ${themeName} changed (hash mismatch), updating base dictionary...`);
+            await this.generateBaseThemeDictionary(themeName);
+            return true;
+        } catch (e) {
+            console.error('[i18n-plus] Failed to check theme dictionary hash:', e);
+            return false;
+        }
+
     }
 }

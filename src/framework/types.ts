@@ -10,18 +10,26 @@
 export interface DictionaryMeta {
     /** Target plugin ID */
     pluginId?: string;
+    /** Theme Name (replaces 'id') */
+    themeName?: string;
     /** Locale identifier (BCP 47), e.g., "zh-CN", "en" */
     locale: string;
-    /** Dictionary version (translation iteration version) */
+    /** Dictionary version (timestamp) */
     dictVersion: string;
     /** Adapted plugin version range, e.g., ">=1.0.0" */
     pluginVersion?: string;
+    /** Theme version */
+    themeVersion?: string;
     /** Primary author (single string for simple display) */
     author?: string;
     /** List of authors */
     authors?: string[];
     /** Description */
     description?: string;
+    /** Deprecated: Theme ID (alias for themeName) */
+    id?: string;
+    /** Source file hash (e.g. hash of theme.css) to track updates */
+    sourceHash?: string;
 }
 
 /**
@@ -136,6 +144,36 @@ export interface I18nPlusAPI {
      * Remove event listener
      */
     off(event: string, callback: (...args: unknown[]) => void): void;
+
+    // ========== Theme Dictionary API (for Style Settings integration) ==========
+
+    /**
+     * Load theme dictionary
+     * @param themeName Theme name (from manifest.json)
+     * @param locale Locale identifier
+     * @param dict Dictionary data
+     */
+    loadThemeDictionary(themeName: string, locale: string, dict: Dictionary): void;
+
+    /**
+     * Unload theme dictionary
+     * @param themeName Theme name
+     * @param locale Locale identifier
+     */
+    unloadThemeDictionary(themeName: string, locale: string): void;
+
+    /**
+     * Get translation for theme/snippet settings (called by Style Settings)
+     * @param themeName Theme name
+     * @param key Translation key (format: {sectionId}.{settingId}.title/desc)
+     * @returns Translated string or undefined
+     */
+    getTranslation(themeName: string, key: string): string | undefined;
+
+    /**
+     * Get list of loaded theme names
+     */
+    getLoadedThemes(): string[];
 }
 
 /**
